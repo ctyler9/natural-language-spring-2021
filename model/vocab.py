@@ -139,7 +139,8 @@ class WSBdata(DataLoader):
 
 		bound1, bound2, bound3, bound4, bound5 = tuple(self.func_percentiles)
 
-
+		# know i could have just made it return a number, but thought
+		# i'd keep it string match to get a general concept across
 		if sentiment >= 0 and sentiment < bound1:
 			return 'very-bearish'
 		elif sentiment >= bound1 and sentiment < bound2:
