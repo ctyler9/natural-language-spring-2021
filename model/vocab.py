@@ -4,9 +4,10 @@ import os
 import sys
 import nltk
 from nltk import word_tokenize
-nltk.download('unkt')
+nltk.download('punkt')
 #import torch
-import importlib
+from tqdm import tqdm
+import torch
 
 
 
@@ -14,15 +15,13 @@ from scipy.sparse import csr_matrix
 import numpy as np 
 from collections import Counter 
 
-import data_crawler
-importlib.reload(data_crawler)
 from data_crawler import DataLoader
 
 
 class Vocab: 
 	def __init__(self): 
 		self.locked = False 
-		self.nextId = 0 
+		self.nextID = 0 
 		self.word2id = {}
 		self.id2word = {}
 
@@ -32,7 +31,7 @@ class Vocab:
 			if self.locked: 
 				return -1 	# UNK token
 			else:
-				self.word2id[word] = self.nextId
+				self.word2id[word] = self.nextID
 				self.id2word[self.word2id[word]] = word 
 				self.nextID += 1 
 		return self.word2id[word]
@@ -53,7 +52,7 @@ class Vocab:
 
 	def get_vocab_size(self):
 		#return self.nextId-1
-		return self.nextId
+		return self.nextID
 
 	def get_words(self):
 		return self.word2id.keys()
@@ -82,16 +81,16 @@ class WSBdata:
 		XfileList = []
 
 		#Read positive files
-		for i in range(len(dataframe)):
-			row = dataframe[i, :]
+		for i in tqdm(range(len(dataframe) // 10)):
+			row = dataframe.iloc[i, :]
 			for line in row[0]:
-				wordList = [self.vocab.GetID(w.lower()) for w in word_tokenize(line) if self.vocab.GetID(w.lower()) >= 0]
+				wordList = [self.vocab.get_id(w.lower()) for w in word_tokenize(line) if self.vocab.get_id(w.lower()) >= 0]
 				XwordList.append(wordList)
 				XfileList.append(row[0])
 				wordCounts = Counter(wordList)
 				for (wordId, count) in wordCounts.items():
 					if wordId >= 0:
-						X_row_indices.append(len(pFiles)+i)
+						X_row_indices.append(len(row[0])+i)
 						X_col_indices.append(wordId)
 						X_values.append(count)
 
@@ -102,10 +101,10 @@ class WSBdata:
 				elif sentiment_value == 'bullish':
 					Y.append(1.0)
 			
-		self.vocab.Lock()
+		self.vocab.lock()
 
 		#Create a sparse matrix in csr format
-		self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.GetVocabSize()))
+		self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.get_vocab_size()))
 		self.Y = np.asarray(Y)
 
 		#Randomly shuffle
