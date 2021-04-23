@@ -18,12 +18,13 @@ from collections import Counter
 from data_crawler import DataLoader
 
 
-class Vocab: 
+class Vocab(): 
 	def __init__(self): 
 		self.locked = False 
 		self.nextID = 0 
 		self.word2id = {}
 		self.id2word = {}
+
 
 	
 	def get_id(self, word):
@@ -62,14 +63,19 @@ class Vocab:
 
 
 
-class WSBdata:
-	def __init__(self, dataframe, vocab=None):
+class WSBdata(DataLoader):
+	def __init__(self, dataframe=None, vocab=None):
 		""" Reads in data into sparse matrix format """
+		super(WSBdata, self).__init__()
+		self.get_stats()
 
 		if not vocab:
 			self.vocab = Vocab()
 		else:
 			self.vocab = vocab
+
+		if not dataframe:
+			dataframe = self.wsb_data
 
 		#For csr_matrix (see http://docs.scipy.org/doc/scipy-0.15.1/reference/generated/scipy.sparse.csr_matrix.html#scipy.sparse.csr_matrix)
 		X_values = []
@@ -81,7 +87,7 @@ class WSBdata:
 		XfileList = []
 
 		#Read positive files
-		for i in tqdm(range(len(dataframe) // 10)):
+		for i in tqdm(range(len(dataframe) // 100)):
 			row = dataframe.iloc[i, :]
 			for line in row[0]:
 				wordList = [self.vocab.get_id(w.lower()) for w in word_tokenize(line) if self.vocab.get_id(w.lower()) >= 0]
@@ -96,10 +102,16 @@ class WSBdata:
 
 				sentiment_value = self.sentiment_function(row)
 
-				if sentiment_value == 'bearish':
+				if sentiment_value == "very-bearish":
+					Y.append(-2.0)
+				elif sentiment_value == "bearish":
 					Y.append(-1.0)
-				elif sentiment_value == 'bullish':
+				elif sentiment_value == "neutral":
+					Y.append(0)
+				elif sentiment_value == "bullish":
 					Y.append(1.0)
+				elif sentiment_value == "very-bullish":
+					Y.append(2.0)
 			
 		self.vocab.lock()
 
@@ -125,14 +137,22 @@ class WSBdata:
 
 		sentiment = theta1*score + theta2*comments
 
+		bound1, bound2, bound3, bound4, bound5 = tuple(self.func_percentiles)
 
-		if sentiment >= 500:
-			return 'bullish'
-		else:
+
+		if sentiment >= 0 and sentiment < bound1:
+			return 'very-bearish'
+		elif sentiment >= bound1 and sentiment < bound2:
 			return 'bearish'
+		elif sentiment >= bound2 and sentiment < bound3:
+			return 'neutral'
+		elif sentiment >= bound3 and sentiment < bound4:
+			return 'bullish'
+		elif sentiment >= bound4 and sentiment < bound5:
+			return 'very-bullish'
 
 
 if __name__ == '__main__':
-	test = WSBdata(DataLoader().get_wsb_data('../data/reddit_wsb.csv'))
+	test = WSBdata()
 
 
