@@ -64,7 +64,7 @@ class Vocab():
 
 
 class WSBdata(DataLoader):
-	def __init__(self, dataframe=None, vocab=None):
+	def __init__(self, dataframe=None, vocab=None, train=True):
 		""" Reads in data into sparse matrix format """
 		super(WSBdata, self).__init__()
 		self.get_stats()
@@ -77,6 +77,12 @@ class WSBdata(DataLoader):
 		if not dataframe:
 			dataframe = self.wsb_data
 
+		rows = dataframe.shape[0]
+		if train:
+			dataframe = dataframe.iloc[rows//4:, :]
+		else:
+			dataframe = dataframe.iloc[:rows//4, :]
+
 		#For csr_matrix (see http://docs.scipy.org/doc/scipy-0.15.1/reference/generated/scipy.sparse.csr_matrix.html#scipy.sparse.csr_matrix)
 		X_values = []
 		X_row_indices = []
@@ -87,7 +93,7 @@ class WSBdata(DataLoader):
 		XfileList = []
 
 		#Read entries
-		for i in tqdm(range(len(dataframe) // 1000)):
+		for i in tqdm(range(len(dataframe) // 100)):
 			row = dataframe.iloc[i, :]
 			for line in row[0]:
 				wordList = [self.vocab.get_id(w.lower()) for w in word_tokenize(line) if self.vocab.get_id(w.lower()) >= 0]
@@ -105,15 +111,15 @@ class WSBdata(DataLoader):
 				sentiment_value = self.sentiment_function(row)
 
 				if sentiment_value == "very-bearish":
-					Y.append(-2.0)
+					Y.append(0.0)
 				elif sentiment_value == "bearish":
-					Y.append(-1.0)
-				elif sentiment_value == "neutral":
-					Y.append(0)
-				elif sentiment_value == "bullish":
 					Y.append(1.0)
-				elif sentiment_value == "very-bullish":
+				elif sentiment_value == "neutral":
 					Y.append(2.0)
+				elif sentiment_value == "bullish":
+					Y.append(3.0)
+				elif sentiment_value == "very-bullish":
+					Y.append(4.0)
 
 			
 		self.vocab.lock()

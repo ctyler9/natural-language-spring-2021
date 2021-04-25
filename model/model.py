@@ -26,7 +26,7 @@ class NBOW(nn.Module):
 
         self.linear = nn.Linear(298, NUM_CLASSES)
         self.relu = nn.ReLU()
-        self.logSoftmax = nn.LogSoftmax()
+        self.logSoftmax = nn.LogSoftmax(dim=0)
 
 
 
@@ -79,6 +79,9 @@ def Train(net, X, Y, n_iter, dev):
             y_onehot = torch.zeros(num_classes)
             y_onehot[int(Y[i])] = 1
 
+            print(x_)
+            print(y_onehot)
+
 
             net.zero_grad()
             logProbs = net.forward(X[i])
@@ -92,12 +95,12 @@ def Train(net, X, Y, n_iter, dev):
 
         net.eval()    #Switch to eval mode
         print(f"loss on epoch {epoch} = {total_loss}")
-        #EvalNet(dev, net)
+        EvalNet(dev, net)
 
 
 if __name__ == "__main__":
     train = WSBdata()
-    dev = WSBdata()
+    dev = WSBdata(train=False)
     nbow = NBOW(train.vocab.get_vocab_size())
     Train(nbow, train.XwordList, (train.Y + 1.0) / 2.0, 5, dev)
 
