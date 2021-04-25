@@ -86,11 +86,13 @@ class WSBdata(DataLoader):
 		XwordList = []
 		XfileList = []
 
-		#Read positive files
-		for i in tqdm(range(len(dataframe) // 100)):
+		#Read entries
+		for i in tqdm(range(len(dataframe) // 1000)):
 			row = dataframe.iloc[i, :]
 			for line in row[0]:
 				wordList = [self.vocab.get_id(w.lower()) for w in word_tokenize(line) if self.vocab.get_id(w.lower()) >= 0]
+				if len(wordList) == 0:
+					continue
 				XwordList.append(wordList)
 				XfileList.append(row[0])
 				wordCounts = Counter(wordList)
@@ -112,6 +114,7 @@ class WSBdata(DataLoader):
 					Y.append(1.0)
 				elif sentiment_value == "very-bullish":
 					Y.append(2.0)
+
 			
 		self.vocab.lock()
 
