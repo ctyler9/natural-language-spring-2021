@@ -67,7 +67,7 @@ class WSBdata(DataLoader):
 	def __init__(self, dataframe=None, vocab=None, train=True):
 		""" Reads in data into sparse matrix format """
 		super(WSBdata, self).__init__()
-		self.get_stats()
+		self.get_stats(dataframe)
 
 		if not vocab:
 			self.vocab = Vocab()
@@ -93,7 +93,7 @@ class WSBdata(DataLoader):
 		XfileList = []
 
 		#Read entries
-		for i in tqdm(range(len(dataframe) // 100)):
+		for i in tqdm(range(len(dataframe) // 1000)):
 			row = dataframe.iloc[i, :]
 			for line in row[0]:
 				wordList = [self.vocab.get_id(w.lower()) for w in word_tokenize(line) if self.vocab.get_id(w.lower()) >= 0]

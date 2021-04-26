@@ -26,7 +26,7 @@ class NBOW(nn.Module):
 
         self.linear = nn.Linear(298, NUM_CLASSES)
         self.relu = nn.ReLU()
-        self.logSoftmax = nn.LogSoftmax(dim=0)
+        #self.logSoftmax = nn.LogSoftmax(dim=0)
 
 
 
@@ -39,14 +39,14 @@ class NBOW(nn.Module):
 
         linear = self.linear(dropout)
         relu = self.relu(linear)
-        output = self.logSoftmax(relu)
+        #output = self.logSoftmax(relu)
         
-        return output
+        return relu
 
 
 def EvalNet(data, net):
     num_correct = 0
-    Y = (data.Y + 1.0) / 2.0
+    Y = (data.Y + 1.0) / 5.0
     X = data.XwordList
     for i in range(len(X)):
         logProbs = net.forward(X[i])
@@ -66,6 +66,8 @@ def Train(net, X, Y, n_iter, dev):
     print("Start Training!")
     #TODO: initialize optimizer.
     optimizer = optim.Adam(net.parameters(), lr=0.1)
+    loss_func = nn.CrossEntropyLoss()
+
 
     num_classes = 5
 
@@ -76,17 +78,16 @@ def Train(net, X, Y, n_iter, dev):
         for i in tqdm(range(len(X))):
             
             x_ = X[i]
-            y_onehot = torch.zeros(num_classes)
-            y_onehot[int(Y[i])] = 1
-
-            print(x_)
-            print(y_onehot)
+            Y_ = int(Y[i])
 
 
             net.zero_grad()
             logProbs = net.forward(X[i])
 
-            loss = torch.neg(logProbs.view(-1)).dot(y_onehot)
+            input_ = logProbs.view(1,-1)
+            target = torch.LongTensor([Y_])
+
+            loss = loss_func(input_, target)
             total_loss += loss 
 
             loss.backward()
