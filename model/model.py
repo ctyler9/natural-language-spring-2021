@@ -113,7 +113,7 @@ class Actor():
 
 
     def forward(self, X):
-        lin1 = self.linear1(flatten)
+        lin1 = self.linear1(X)
         lin2 = self.linear2(lin1)
         lin3 = self.linear3(lin2)
         output = self.logSoftmax(lin3)
@@ -129,8 +129,8 @@ class Critic():
         self.linear2 = nn.Linear(128, 256)
         self.linear3 = nn.Linear(256, 1) 
 
-    def forward(self, state):
-        lin1 = F.relu(self.linear1(state))
+    def forward(self, X):
+        lin1 = F.relu(self.linear1(X))
         lin2 = F.relu(self.linear2(output))
         output = self.linear3(output)
         
