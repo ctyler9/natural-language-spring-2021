@@ -10,19 +10,25 @@ import matplotlib.pyplot as plt
 
 
 class DataLoader():
-	def __init__(self, csv_file_path):
+	def __init__(self, csv_file_path, dataframe=None):
 		self.wsb_data = None
 		self.stock_data = None
 		self.score_percentiles = None
 		self.comment_percentiles = None
 		self.func_percentiles = None
-
-		self.get_wsb_data(csv_file_path)
+		if dataframe is None:
+			self.get_wsb_data(csv_file_path)
+		else:
+			self.wsb_data = dataframe
 
 
 	def get_wsb_data(self, path):
-		data = pd.read_csv(path, delimiter=",", skiprows=1)
-		self.wsb_data = data
+		data = pd.read_csv(path, delimiter=",")
+		title = data['title'].values
+		upvotes = data['score'].values
+		comment_num = data['comms_num'].values
+		wsb_data = pd.DataFrame({'title':title, 'score':upvotes, 'comms_num':comment_num})
+		self.wsb_data = wsb_data
 
 		return data
 
@@ -46,7 +52,7 @@ class DataLoader():
 
 	def get_stats(self, plot=False):
 		score = self.wsb_data.iloc[:, 1].to_numpy()
-		comments = self.wsb_data.iloc[:, 4].to_numpy()
+		comments = self.wsb_data.iloc[:, 2].to_numpy()
 
 
 		theta1 = .5

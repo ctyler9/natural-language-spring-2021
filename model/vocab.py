@@ -63,12 +63,12 @@ def create_vocab(wsb_data):
     for item in wsb_data:
         tokenized_item = word_tokenize(item)
         for word in tokenized_item:
-            id = vocab.GetID(word.lower())
-    vocab.Lock()
+            id = vocab.get_id(word.lower())
+    vocab.lock()
     return vocab
 
 def load_csv(csv_file_path):
-	data = pd.read_csv(path, delimiter=",")
+	data = pd.read_csv(csv_file_path, delimiter=",")
 	title = data['title'].values
 	upvotes = data['score'].values
 	comment_num = data['comms_num'].values
@@ -79,7 +79,7 @@ def load_csv(csv_file_path):
 class WSBdata(DataLoader):
 	def __init__(self, csv_file_path, dataframe=None, vocab=None, train=True):
 		""" Reads in data into sparse matrix format """
-		super(WSBdata, self).__init__(csv_file_path)
+		super(WSBdata, self).__init__(csv_file_path, dataframe=dataframe)
 		self.get_stats()
 
 		if not vocab:
@@ -87,11 +87,11 @@ class WSBdata(DataLoader):
 		else:
 			self.vocab = vocab
 
-		if not dataframe:
+		if dataframe is None:
 			dataframe = self.wsb_data
 
 		rows = dataframe.shape[0]
-		
+
 		# if train:
 		# 	dataframe = dataframe.iloc[rows//4:, :]
 		# else:
@@ -118,11 +118,11 @@ class WSBdata(DataLoader):
 					wordlist.append(id)
 
 			# wordList = [self.vocab.get_id(w.lower()) for w in word_tokenize(title) if self.vocab.get_id(w.lower()) >= 0]
-			if len(wordList) == 0:
+			if len(wordlist) == 0:
 				continue
-			XwordList.append(wordList)
+			XwordList.append(wordlist)
 			XfileList.append(row[0])
-			wordCounts = Counter(wordList)
+			wordCounts = Counter(wordlist)
 			for (wordId, count) in wordCounts.items():
 				if wordId >= 0:
 					X_row_indices.append(len(row[0])+i)
@@ -132,15 +132,15 @@ class WSBdata(DataLoader):
 			sentiment_value = self.sentiment_function(row)
 
 			if sentiment_value == "very-bearish":
-				Y.append(0.0)
+				Y.append(0)
 			elif sentiment_value == "bearish":
-				Y.append(1.0)
+				Y.append(1)
 			elif sentiment_value == "neutral":
-				Y.append(2.0)
+				Y.append(2)
 			elif sentiment_value == "bullish":
-				Y.append(3.0)
+				Y.append(3)
 			elif sentiment_value == "very-bullish":
-				Y.append(4.0)
+				Y.append(4)
 			# for line in row[0]:
 			# 	wordList = [self.vocab.get_id(w.lower()) for w in word_tokenize(line) if self.vocab.get_id(w.lower()) >= 0]
 			# 	if len(wordList) == 0:
@@ -171,19 +171,23 @@ class WSBdata(DataLoader):
 		self.vocab.lock()
 
 		#Create a sparse matrix in csr format
-		self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.get_vocab_size()))
+		# self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.get_vocab_size()))
 		self.Y = np.asarray(Y)
-
+		print(self.Y.shape)
+		print(len(XwordList))
 		#Randomly shuffle
-		index = np.arange(self.X.shape[0])
+		index = np.arange(len(XwordList))
+		# print(self.X.shape)
+		# index = np.arange(self.X.shape[0])
 		np.random.shuffle(index)
-		self.X = self.X[index,:]
+		# self.X = self.X[index,:]
 		self.XwordList = [torch.LongTensor(XwordList[i]) for i in index]  #Two different sparse formats, csr and lists of IDs (XwordList).
 		self.XfileList = [XfileList[i] for i in index]
 		self.Y = self.Y[index]
 
 
 	def sentiment_function(self, df_row):
+		# import pdb; pdb.set_trace()
 		score = df_row[1]
 		comments = df_row[2]
 
@@ -193,7 +197,6 @@ class WSBdata(DataLoader):
 		sentiment = theta1*score + theta2*comments
 
 		bound1, bound2, bound3, bound4, bound5 = tuple(self.func_percentiles)
-
 		# know i could have just made it return a number, but thought
 		# i'd keep it string match to get a general concept across
 		if sentiment >= 0 and sentiment < bound1:
@@ -206,6 +209,8 @@ class WSBdata(DataLoader):
 			return 'bullish'
 		elif sentiment >= bound4 and sentiment < bound5:
 			return 'very-bullish'
+		else:
+			return "very-bullish"
 
 
 if __name__ == '__main__':

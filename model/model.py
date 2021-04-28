@@ -26,8 +26,8 @@ class NBOW(nn.Module):
         self.dropout = nn.Dropout(p=0.55)
         self.linear1 = nn.Linear(2100, NUM_CLASSES)
         # self.linear2 = nn.Linear(10, NUM_CLASSES)
-        # self.log_softmax = nn.LogSoftmax(dim=1)
-        #self.logSoftmax = nn.LogSoftmax(dim=0)
+        self.log_softmax = nn.LogSoftmax(dim=1)
+
 
     def forward(self, X):
         out1  = self.embedding(X)
@@ -44,10 +44,9 @@ class NBOW(nn.Module):
         lin_input = torch.cat((max_1, max_2, max_3), dim=1)
         drop_out = self.dropout(lin_input)
         lin_out_1 = self.linear1(drop_out)
-        output = lin_out_1
+        # output = lin_out_1
         # lin_out_2 = self.linear2(lin_out_1)
-        # output = self.log_softmax(lin_out_1)
-        #return raw logits since we are using nn.CrossEntropyLoss
+        output = self.log_softmax(lin_out_1)
         return output
         # embedded = self.embedded(X)
         # embedded = embedded.unsqueeze(0)
@@ -139,7 +138,7 @@ class Actor():
         return output
 
 class Critic():
-    def __init__(self. state_size, action_size):
+    def __init__(self, state_size, action_size):
         super(Critic, self).__init__()
         self.state_size = state_size
         self.action_size = action_size
