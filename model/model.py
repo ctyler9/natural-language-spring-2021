@@ -99,11 +99,60 @@ def Train(net, X, Y, n_iter, dev):
         EvalNet(dev, net)
 
 
-if __name__ == "__main__":
+
+class Actor():
+    def __init__(self, state_size, action_size): 
+        super(Actor, self).__init__()
+        self.state_size = state_size
+        self.action_size = action_size
+
+        self.linear1 = nn.Linear(state_size, 128)
+        self.linear2 = nn.Linear(128, 256)
+        self.linear3 = nn.Linear(256, action_size)
+        self.logSoftmax = nn.LogSoftmax(dim=-1) 
+
+
+    def forward(self, X):
+        lin1 = self.linear1(flatten)
+        lin2 = self.linear2(lin1)
+        lin3 = self.linear3(lin2)
+        output = self.logSoftmax(lin3)
+
+        return output
+
+class Critic(): 
+    def __init__(self. state_size, action_size): 
+        super(Critic, self).__init__()
+        self.state_size = state_size
+        self.action_size = action_size
+        self.linear1 = nn.Linear(self.state_size, 128)
+        self.linear2 = nn.Linear(128, 256)
+        self.linear3 = nn.Linear(256, 1) 
+
+    def forward(self, state):
+        lin1 = F.relu(self.linear1(state))
+        lin2 = F.relu(self.linear2(output))
+        output = self.linear3(output)
+        
+        return output
+
+
+
+def main(): 
     train = WSBdata()
     dev = WSBdata(train=False)
     nbow = NBOW(train.vocab.get_vocab_size())
     Train(nbow, train.XwordList, (train.Y + 1.0) / 2.0, 5, dev)
+
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
 
 
 
