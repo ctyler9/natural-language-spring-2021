@@ -9,7 +9,7 @@ import copy
 from collections import deque 
 
 
-from model import ActorModel, CriticModel
+from model import Actor, Critic
 
 
 
@@ -37,9 +37,7 @@ class CustomEnvironment():
 		self.optimizer = Adam 
 
 		# call in actor critic model 
-		self.Actor = ActorModel(input_shape=self.state_size, action_space=self.action_space.shape[0], lr=self.lr, optimizer=self.optimizer)
-		self.Critic = CriticModel(input_shape=self.state_size, action_space=self.action_space.shape[0], lr=self.lr, optimizer=self.optimizer)
-
+		# call actor and critic model
 
 
 	def writer():
@@ -156,8 +154,8 @@ class CustomEnvironment():
         #discounted_r = np.vstack(self.discount_rewards(rewards))
 
         # Get Critic network predictions 
-        values = self.Critic.predict(states)
-        next_values = self.Critic.predict(next_states)
+        values = self.Critic(states)
+        next_values = self.Critic(next_states)
         # Compute advantages
         #advantages = discounted_r - values
         advantages, target = self.get_gaes(rewards, dones, np.squeeze(values), np.squeeze(next_values))
@@ -166,13 +164,13 @@ class CustomEnvironment():
         y_true = np.hstack([advantages, predictions, actions])
         
         # training Actor and Critic networks
-        a_loss = self.Actor.Actor.fit(states, y_true, epochs=self.epochs, verbose=0, shuffle=True)
-        c_loss = self.Critic.Critic.fit(states, target, epochs=self.epochs, verbose=0, shuffle=True)
-
+        # call action loss
+        # call critic loss 
+       
         self.replay_count += 1
         
     def act(self, state):
         # Use the network to predict the next action to take, using the model
-        prediction = self.Actor.predict(np.expand_dims(state, axis=0))[0]
+        # call action prediction
         action = np.random.choice(self.action_space, p=prediction)
         return action, prediction
