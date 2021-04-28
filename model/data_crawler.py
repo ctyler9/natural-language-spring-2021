@@ -4,20 +4,20 @@
 
 import numpy as np
 import pandas as pd
-import os 
+import os
 import matplotlib.pyplot as plt
 
 
 
 class DataLoader():
-	def __init__(self):
-		self.wsb_data = None 
-		self.stock_data = None 
-		self.score_percentiles = None 
+	def __init__(self, csv_file_path):
+		self.wsb_data = None
+		self.stock_data = None
+		self.score_percentiles = None
 		self.comment_percentiles = None
 		self.func_percentiles = None
 
-		self.get_wsb_data('../data/reddit_wsb.csv')
+		self.get_wsb_data(csv_file_path)
 
 
 	def get_wsb_data(self, path):
@@ -29,33 +29,33 @@ class DataLoader():
 	def get_stock_data(self, path):
 		files = os.listdir(path)
 
-		for file in files: 
+		for file in files:
 			data = pd.read_csv(file, delimiter=",")
-			## will continue this if decide to add 
+			## will continue this if decide to add
 
 
 	def reddit_api_call(self, json='api.json'):
-		### read json and load api 
-		pass 
+		### read json and load api
+		pass
 
-	def get_live_wsb(self): 
+	def get_live_wsb(self):
 		self.reddit_api_call()
 
-		### call data in 
-		pass 
+		### call data in
+		pass
 
 	def get_stats(self, plot=False):
 		score = self.wsb_data.iloc[:, 1].to_numpy()
 		comments = self.wsb_data.iloc[:, 4].to_numpy()
 
 
-		theta1 = .5 
-		theta2 = .5 
+		theta1 = .5
+		theta2 = .5
 		func = theta1 * score + theta2 * comments
 
 
-		## all pareto distributions which really shouldn't come as too 
-		## much of a surprise -- 
+		## all pareto distributions which really shouldn't come as too
+		## much of a surprise --
 		if plot:
 			hist1 = plt.hist(score, bins=100, range=(0, 500))
 			hist2 = plt.hist(comments, bins=100, range=(0, 500))
@@ -77,11 +77,7 @@ class DataLoader():
 		self.func_percentiles = func_percentiles
 
 
-		return None
-
 
 
 if __name__ == '__main__':
 	DataLoader().get_stats()
-
-
