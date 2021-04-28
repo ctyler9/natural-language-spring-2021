@@ -30,11 +30,11 @@ class CustomEnvironment():
 		self.state_size = (self.lookback_window_size, 10)
 
 
-		# hyperparameters 	
+		# hyperparameters   
 		self.lr = 0.001 
 		self.epochs = 1
 		self.normalize_value = 1000 
-		self.optimizer = Adam 
+		#self.optimizer = Adam 
 
 		# call in actor critic model 
 		# call actor and critic model
@@ -63,11 +63,12 @@ class CustomEnvironment():
 		self.current_step = self.start_step
 
 		for i in reversed(range(self.lookback_window_size)):
+			current_step = self.current_step - i
 			self.orders_history.append([self.balance, self.net_worth, self.stock_bought, self.stock_sold, self.stock_held])
-			self.market_history.append([self.df.loc[current_step, "open"],
-										self.df.loc[current_step, "high"],
-										self.df.loc[current_step, "low"],
-										self.df.loc[current_step, "close"]
+			self.market_history.append([self.df.loc[current_step, "Open"],
+										self.df.loc[current_step, "High"],
+										self.df.loc[current_step, "Low"],
+										self.df.loc[current_step, "Close"]
 										])
 		
 		state = np.concatenate((self.market_history, self.orders_history), axis=1)
@@ -76,10 +77,10 @@ class CustomEnvironment():
 
 
 	def _next_observation(self):
-		self.market_history.append([self.df.loc[current_step, "open"],
-										self.df.loc[current_step, "high"],
-										self.df.loc[current_step, "low"],
-										self.df.loc[current_step, "close"]
+		self.market_history.append([self.df.loc[self.current_step, "Open"],
+										self.df.loc[self.current_step, "High"],
+										self.df.loc[self.current_step, "Low"],
+										self.df.loc[self.current_step, "Close"]
 										])
 
 		obs = np.concatenate((self.market_history, self.orders_history), axis=1)
@@ -95,8 +96,8 @@ class CustomEnvironment():
 		self.current_step += 1
 
 
-		open_ = self.df.loc[self.current_step, "open"]
-		close = self.df.loc[self.current_step, "close"]
+		open_ = self.df.loc[self.current_step, "Open"]
+		close = self.df.loc[self.current_step, "Close"]
 		current_price = random.uniform(open_, close)
 
 		if action == 0:
@@ -134,43 +135,55 @@ class CustomEnvironment():
 	def get_gaes(self, rewards, dones, values, next_values, gamma=0.99, lamda=0.95, normalize=True): 
 		deltas = [r + gamma * (1 - d) * nv - v for r, d, nv, v in zip(rewards, dones, next_values, values)]
 		deltas = np.stack(deltas)
-        gaes = copy.deepcopy(deltas)
-        for t in reversed(range(len(deltas) - 1)):
-            gaes[t] = gaes[t] + (1 - dones[t]) * gamma * lamda * gaes[t + 1]
+		gaes = copy.deepcopy(deltas)
+		for t in reversed(range(len(deltas) - 1)):
+			gaes[t] = gaes[t] + (1 - dones[t]) * gamma * lamda * gaes[t + 1]
 
-        target = gaes + values
-        if normalize:
-            gaes = (gaes - gaes.mean()) / (gaes.std() + 1e-8)
-        return np.vstack(gaes), np.vstack(target)
+		target = gaes + values
+		if normalize:
+			gaes = (gaes - gaes.mean()) / (gaes.std() + 1e-8)
+		return np.vstack(gaes), np.vstack(target)
 
-    def replay(self, states, actions, rewards, predictions, dones, next_states):
-        # reshape memory to appropriate shape for training
-        states = np.vstack(states)
-        next_states = np.vstack(next_states)
-        actions = np.vstack(actions)
-        predictions = np.vstack(predictions)
+	def replay(self, states, actions, rewards, predictions, dones, next_states):
+		# reshape memory to appropriate shape for training
+		states = np.vstack(states)
+		next_states = np.vstack(next_states)
+		actions = np.vstack(actions)
+		predictions = np.vstack(predictions)
 
-        # Compute discounted rewards
-        #discounted_r = np.vstack(self.discount_rewards(rewards))
+		# Compute discounted rewards
+		#discounted_r = np.vstack(self.discount_rewards(rewards))
 
-        # Get Critic network predictions 
-        values = self.Critic(states)
-        next_values = self.Critic(next_states)
-        # Compute advantages
-        #advantages = discounted_r - values
-        advantages, target = self.get_gaes(rewards, dones, np.squeeze(values), np.squeeze(next_values))
-        
-        # stack everything to numpy array
-        y_true = np.hstack([advantages, predictions, actions])
-        
-        # training Actor and Critic networks
-        # call action loss
-        # call critic loss 
-       
-        self.replay_count += 1
-        
-    def act(self, state):
-        # Use the network to predict the next action to take, using the model
-        # call action prediction
-        action = np.random.choice(self.action_space, p=prediction)
-        return action, prediction
+		# Get Critic network predictions 
+		values = self.Critic(states)
+		next_values = self.Critic(next_states)
+		# Compute advantages
+		#advantages = discounted_r - values
+		advantages, target = self.get_gaes(rewards, dones, np.squeeze(values), np.squeeze(next_values))
+		
+		# stack everything to numpy array
+		y_true = np.hstack([advantages, predictions, actions])
+		
+		# training Actor and Critic networks
+		# call action loss
+		# call critic loss 
+	   
+		self.replay_count += 1
+		
+	def act(self, state):
+		# Use the network to predict the next action to take, using the model
+		# call action prediction
+		action = np.random.choice(self.action_space, p=prediction)
+		return action, prediction
+
+
+
+def main():
+	pass #env = CustomEnvironment(pd.read_csv('pricedata.csv'))
+
+
+if __name__ == "__main__":
+	main()
+
+
+
