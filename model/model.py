@@ -134,8 +134,9 @@ class Actor():
         lin2 = self.linear2(lin1)
         lin3 = self.linear3(lin2)
         output = self.logSoftmax(lin3)
-
+        
         return output
+
 
 class Critic():
     def __init__(self, state_size, action_size):
@@ -160,7 +161,6 @@ def main():
     dev = WSBdata(train=False)
     nbow = NBOW(train.vocab.get_vocab_size())
     Train(nbow, train.XwordList, (train.Y + 1.0) / 2.0, 5, dev)
-
 
 
 if __name__ == "__main__":
