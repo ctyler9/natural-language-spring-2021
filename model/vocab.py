@@ -14,7 +14,7 @@ from scipy.sparse import csr_matrix
 import numpy as np
 from collections import Counter
 
-from data_crawler import DataLoader
+from data import DataLoader
 
 
 class Vocab():
