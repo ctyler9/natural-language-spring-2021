@@ -10,30 +10,24 @@ import matplotlib.pyplot as plt
 
 
 class DataLoader():
-	def __init__(self, csv_file_path):
-		self.wsb_data = None
+	def __init__(self, path, dataframe=None):
+		self.data = None
 		self.stock_data = None
 		self.score_percentiles = None
 		self.comment_percentiles = None
 		self.func_percentiles = None
-
-		self.get_wsb_data(csv_file_path)
-
-
-	def get_wsb_data(self, path):
-		data = pd.read_csv(path, delimiter=",", skiprows=1)
-		self.wsb_data = data
-
-		return data
-
-	def get_stock_data(self, path):
-		files = os.listdir(path)
-
-		for file in files:
-			data = pd.read_csv(file, delimiter=",")
-			## will continue this if decide to add
+		if dataframe is None:
+			self.data = pd.read_csv(path)
 
 
+	def wsb_data_edit(self):
+		#data = pd.read_csv(path, delimiter=",")
+		wsb_data = self.data[["title", "score", "comms_num"]]
+
+		return wsb_data
+
+
+	
 	def reddit_api_call(self, json='api.json'):
 		### read json and load api
 		pass
@@ -44,9 +38,9 @@ class DataLoader():
 		### call data in
 		pass
 
-	def get_stats(self, plot=False):
-		score = self.wsb_data.iloc[:, 1].to_numpy()
-		comments = self.wsb_data.iloc[:, 4].to_numpy()
+	def get_stats_wsb(self, plot=False):
+		score = self.data.iloc[:, 1].to_numpy()
+		comments = self.data.iloc[:, 2].to_numpy()
 
 
 		theta1 = .5
@@ -76,8 +70,11 @@ class DataLoader():
 		self.comment_percentiles = comment_percentiles
 		self.func_percentiles = func_percentiles
 
-
+	
 
 
 if __name__ == '__main__':
-	DataLoader().get_stats()
+	wsb_path = "../data/reddit_wsb.csv"
+	twitter_path = "../data/twitter_data.csv" 
+
+	dl = DataLoader(twitter_path)
