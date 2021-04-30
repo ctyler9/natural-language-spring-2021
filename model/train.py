@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import argparse
 from model import NBOW
-from vocab import Vocab, WSBdata, load_csv, create_vocab
+from vocab import Vocab, WSBData, load_csv, create_vocab
 
 
 def parse_args():
@@ -175,9 +175,9 @@ def main():
     dev_df = wsb_data[split_point:]
 
     print("load train data")
-    train_data = WSBdata(wsb_file_path, dataframe=train_df, vocab=vocab, train=True)
+    train_data = WSBData(wsb_file_path, dataframe=train_df, vocab=vocab, train=True)
     print("load dev data")
-    dev_data = WSBdata(wsb_file_path, dataframe=dev_df, vocab=vocab, train=False)
+    dev_data = WSBData(wsb_file_path, dataframe=dev_df, vocab=vocab, train=False)
     print(train_data.vocab.get_vocab_size())
     if device == "gpu":
         device = torch.device('cuda:0')

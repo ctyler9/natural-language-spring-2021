@@ -23,7 +23,9 @@ class DataLoader():
 	def wsb_data_edit(self):
 		#data = pd.read_csv(path, delimiter=",")
 		wsb_data = self.data[["title", "score", "comms_num"]]
-
+		wsb_data["title"] = np.log(wsb_data.title)
+		wsb_data["score"] = np.log(wsb_data.score)
+		
 		return wsb_data
 
 
@@ -41,6 +43,9 @@ class DataLoader():
 	def get_stats_wsb(self, plot=False):
 		score = self.data.iloc[:, 1].to_numpy()
 		comments = self.data.iloc[:, 2].to_numpy()
+
+		score = np.log(score)
+		comments = np.log(comments)
 
 
 		theta1 = .5
@@ -70,7 +75,7 @@ class DataLoader():
 		self.comment_percentiles = comment_percentiles
 		self.func_percentiles = func_percentiles
 
-	
+
 
 
 if __name__ == '__main__':
