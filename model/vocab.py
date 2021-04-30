@@ -302,4 +302,3 @@ class TwitterData(DataLoader):
 
 if __name__ == '__main__':
 	test = TwitterData("../data/twitter_data.csv")
-	print(test)
