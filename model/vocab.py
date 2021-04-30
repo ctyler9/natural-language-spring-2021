@@ -76,11 +76,11 @@ def load_csv(csv_file_path):
 	return wsb_data
 
 
-class WSBdata(DataLoader):
+class WSBData(DataLoader):
 	def __init__(self, csv_file_path, dataframe=None, vocab=None, train=True):
 		""" Reads in data into sparse matrix format """
 		super(WSBdata, self).__init__(csv_file_path, dataframe=dataframe)
-		self.get_stats()
+		self.get_stats_wsb()
 
 		if not vocab:
 			self.vocab = Vocab()
@@ -213,5 +213,76 @@ class WSBdata(DataLoader):
 			return "very-bullish"
 
 
+
+class TwitterData(DataLoader): 
+	def __init__(self, csv_file_path, dataframe=None, vocab=None, train=True):
+		""" Reads in data into sparse matrix format """
+		super(TwitterData, self).__init__(csv_file_path, dataframe=dataframe)
+
+		if not vocab:
+			self.vocab = Vocab()
+		else:
+			self.vocab = vocab
+
+		if dataframe is not None:
+			self.dataframe = dataframe
+		else:
+			self.dataframe = pd.read_csv(csv_file_path)
+
+
+		rows = self.dataframe.shape[0]
+
+		X_values = []
+		X_row_indices = []
+		X_col_indices = []
+		Y = []
+
+		XwordList = []
+		XfileList = []
+
+		#Read entries
+		for i in tqdm(range(len(self.dataframe))):
+			row = self.dataframe.iloc[i, :]
+			title = row[0]
+			wordlist = []
+			tokenized_title = word_tokenize(title)
+			for w in tokenized_title:
+				id = self.vocab.get_id(w.lower())
+				if id >= 0:
+					wordlist.append(id)
+
+			if len(wordlist) == 0:
+				continue
+			XwordList.append(wordlist)
+			XfileList.append(row[0])
+			wordCounts = Counter(wordlist)
+			for (wordId, count) in wordCounts.items():
+				if wordId >= 0:
+					X_row_indices.append(len(row[0])+i)
+					X_col_indices.append(wordId)
+					X_values.append(count)
+
+			Y.append(row[1])
+
+
+		self.vocab.lock()
+
+		#Create a sparse matrix in csr format
+		# self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.get_vocab_size()))
+		self.Y = np.asarray(Y)
+		print(self.Y.shape)
+		print(len(XwordList))
+		#Randomly shuffle
+		index = np.arange(len(XwordList))
+		# print(self.X.shape)
+		# index = np.arange(self.X.shape[0])
+		np.random.shuffle(index)
+		# self.X = self.X[index,:]
+		self.XwordList = [torch.LongTensor(XwordList[i]) for i in index]  #Two different sparse formats, csr and lists of IDs (XwordList).
+		self.XfileList = [XfileList[i] for i in index]
+		self.Y = self.Y[index]
+
+
 if __name__ == '__main__':
-	test = WSBdata()
+	test = TwitterData("../data/twitter_data.csv")
+	print(test)
