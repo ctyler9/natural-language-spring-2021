@@ -219,6 +219,11 @@ class TwitterData(DataLoader):
 		""" Reads in data into sparse matrix format """
 		super(TwitterData, self).__init__(csv_file_path, dataframe=dataframe)
 
+		# Right now there is a mess of refferring to the dataloader object and 
+		# just importing the csv in general -- i'll see how much we need the 
+		# data loader script (important for stats about WSB data and additonally
+		# if we decide to make an API call to scrape data (little less likely))
+
 		if not vocab:
 			self.vocab = Vocab()
 		else:
