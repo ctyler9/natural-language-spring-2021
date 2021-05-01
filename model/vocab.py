@@ -355,14 +355,17 @@ class WSBDataLarge():
 			### Add Y logic 
 
 			reddit_date = row[-1] + timedelta(days=1)
+			#reddit_date_mon = row[-1] + timedelta(days=2)
 			str_time = reddit_date.strftime('%m') + '-' + reddit_date.strftime('%d') 
-			# print(str_time)
-			# print(self.gme_stock_dict)
+			#str_time_mon = reddit_date_mon.strftime('%m') + '-' + reddit_date_mon.strftime('%d') 
+
+				
+			# need to figure out the fix for Friday to Saturday
 			try:
 				Y.append(self.gme_stock_dict[str_time])	
 			except:
+				#Y.append(self.gme_stock_dict[str_time_mon])
 				Y.append(0)
-
 
 
 		self.vocab.lock()
