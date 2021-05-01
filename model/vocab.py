@@ -72,8 +72,8 @@ def load_csv(csv_file_path, type_=None):
 	if type_ == "reddit" or type_ == None:
 		data = pd.read_csv(csv_file_path, delimiter=",")
 		data = data[["title", "score", "comms_num", "timestamp"]]
-	
-	if type_ == "twitter": 
+
+	if type_ == "twitter":
 		data = pd.read_csv(csv_file_path, delimiter=",")
 
 	return data
@@ -88,10 +88,10 @@ class WSBData():
 			self.vocab = vocab
 
 		if dataframe is not None:
-			self.dataframe = dataframe 
+			self.dataframe = dataframe
 		else:
 			self.dataframe = pd.read_csv(csv_file_path)
-		
+
 		rows = self.dataframe.shape[0]
 
 		self.get_stats_wsb()
@@ -195,12 +195,12 @@ class WSBData():
 		score = self.dataframe.iloc[:, 1].to_numpy()
 		comments = self.dataframe.iloc[:, 2].to_numpy()
 
-		score = np.log(score)
-		comments = np.log(comments)
+		score = np.log(score + 0.00001)
+		comments = np.log(comments + 0.00001)
 
 
-		theta1 = .5
-		theta2 = .5
+		theta1 = .75
+		theta2 = .25
 		func = theta1 * score + theta2 * comments
 
 
@@ -214,7 +214,7 @@ class WSBData():
 		score_percentiles = []
 		comment_percentiles = []
 		func_percentiles = []
-		for perc in range(0, 100, 00):
+		for perc in range(0, 100, 20):
 			s_perc = np.percentile(score, perc)
 			c_perc = np.percentile(comments, perc)
 			f_perc = np.percentile(func, perc)
@@ -227,7 +227,7 @@ class WSBData():
 		self.func_percentiles = func_percentiles
 
 
-class TwitterData(): 
+class TwitterData():
 	def __init__(self, csv_file_path, dataframe=None, vocab=None, train=True):
 		""" Reads in data into sparse matrix format """
 		if not vocab:
@@ -303,10 +303,10 @@ class WSBDataLarge():
 			self.vocab = vocab
 
 		if dataframe is not None:
-			self.dataframe = dataframe 
+			self.dataframe = dataframe
 		else:
 			self.dataframe = pd.read_csv(csv_file_path)
-		
+
 		rows = self.dataframe.shape[0]
 
 		self.stock_price(pd.read_csv("../data/GME.csv"))
@@ -314,9 +314,9 @@ class WSBDataLarge():
 
 		#self.dataframe["Date"] = pd.to_datetime(dataframe["Date"], format='%Y-%m-%d %H:%M:%S')
 
-		
+
 		self.dataframe["timestamp"] = pd.to_datetime(self.dataframe["timestamp"], format='%Y-%m-%d %H:%M:%S')
-		
+
 		isBusinessday = BDay().onOffset
 		match_series = self.dataframe["timestamp"].map(isBusinessday)
 		self.dataframe = self.dataframe[match_series]
@@ -352,17 +352,17 @@ class WSBDataLarge():
 					X_col_indices.append(wordId)
 					X_values.append(count)
 
-			### Add Y logic 
+			### Add Y logic
 
 			reddit_date = row[-1] + timedelta(days=1)
 			#reddit_date_mon = row[-1] + timedelta(days=2)
-			str_time = reddit_date.strftime('%m') + '-' + reddit_date.strftime('%d') 
-			#str_time_mon = reddit_date_mon.strftime('%m') + '-' + reddit_date_mon.strftime('%d') 
+			str_time = reddit_date.strftime('%m') + '-' + reddit_date.strftime('%d')
+			#str_time_mon = reddit_date_mon.strftime('%m') + '-' + reddit_date_mon.strftime('%d')
 
-				
+
 			# need to figure out the fix for Friday to Saturday
 			try:
-				Y.append(self.gme_stock_dict[str_time])	
+				Y.append(self.gme_stock_dict[str_time])
 			except:
 				#Y.append(self.gme_stock_dict[str_time_mon])
 				Y.append(0)
@@ -401,7 +401,7 @@ class WSBDataLarge():
 		self.gme_stock_dict = pd.Series(df.Up_Down, index=df.Date_str)
 
 
-		return None 
+		return None
 
 
 

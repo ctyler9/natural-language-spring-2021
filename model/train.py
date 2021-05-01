@@ -24,6 +24,7 @@ def parse_args():
         choices=["cpu", "gpu"],
         default="cpu",
     )
+    parser.add_argument("--model_type", type=str, choices=["nbow", "attention"], default="nbow")
     parser.add_argument("--save_model", dest="save_model", action="store_true")
     args = parser.parse_args()
     return args
@@ -56,6 +57,8 @@ def eval_network(data, net, use_gpu=False, batch_size=25, device=torch.device('c
         batch_x = pad_batch_input(X[batch:batch + batch_size], device=device)
         batch_y = torch.tensor(Y[batch:batch + batch_size], device=device)
         batch_y_hat = net.forward(batch_x)
+        if isinstance(net, AttentionModel):
+            batch_y_hat = batch_y_hat[0]
         predictions = batch_y_hat.argmax(dim=1)
         batch_predictions.append(predictions)
         # num_correct = float((predictions == batch_y).sum())
@@ -111,7 +114,7 @@ def train_network(net, X, Y, num_epochs, dev, lr=0.001, batchSize=50, use_gpu=Fa
             batch_onehot_labels = convert_to_onehot(batch_labels, NUM_CLASSES=num_classes, device=device)
             optimizer.zero_grad()
             batch_y_hat = net.forward(batch_tweets)
-            if len(batch_y_hat) != 1: # if its a tuple
+            if isinstance(net, AttentionModel): # if its a tuple
                 batch_y_hat = batch_y_hat[0]
             batch_losses = torch.neg(batch_y_hat)*batch_onehot_labels #cross entropy loss
             loss = batch_losses.mean()
@@ -146,6 +149,7 @@ def main():
     wsb_file_path = args.wsb_csv_file
     device = args.device
     save_model = args.save_model
+    model_type = args.model_type
     wsb_data = load_csv(wsb_file_path)
     vocab = create_vocab(wsb_data['title'].values)
 
@@ -160,65 +164,76 @@ def main():
     print(train_data.vocab.get_vocab_size())
     if device == "gpu":
         device = torch.device('cuda:0')
-        nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300).cuda()
+
+        if model_type == "nbow":
+            model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300).cuda()
+        elif model_type == "attention":
+            model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350).cuda()
+
         X = train_data.XwordList
         Y = train_data.Y
-        losses, accuracies = train_network(nbow_model, X, Y, 12, dev_data, lr=0.055, batchSize=100, device = device)
+        losses, accuracies = train_network(model, X, Y, 12, dev_data, lr=0.055, batchSize=100, device = device)
         print(accuracies)
-        # train_model(nbow_model, X, Y, 1, dev_data, use_cuda=True)
+
     else:
         device = torch.device('cpu')
-        nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300)
+        # nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300)
+        if model_type == "nbow":
+            model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300).cuda()
+        elif model_type == "attention":
+            model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350).cuda()
+
+
         X = train_data.XwordList
         Y = train_data.Y
-        losses, accuracies = train_network(nbow_model, X, Y, 12, dev_data, batchSize=150, device = device)
+        losses, accuracies = train_network(model, X, Y, 12, dev_data, batchSize=150, device = device)
         print(accuracies)
-        # train_model(nbow_model, X, Y, 1, dev_data, use_cuda=False)
+
+    plot_accuracy(accuracies, model_type + "-Sentiment WSB")
+    np.save(model_type  +"-sentiment-accuracy-wsb.npy", np.array(accuracies))
 
     if save_model:
-        torch.save(nbow_model.state_dict(), "saved_models/nbow.pth")
-    plot_accuracy(accuracies, "CNN-Sentiment")
-    np.save("cnn-sentiment-accuracy.npy", np.array(accuracies))
+        torch.save(model.state_dict(), "saved_models/" + model_type + ".pth")
 
 
 
-def main_attention():
-    args = parse_args()
-    wsb_file_path = args.wsb_csv_file
-    device = args.device
-    save_model = args.save_model
-    wsb_data = load_csv(wsb_file_path)
-    vocab = create_vocab(wsb_data['title'].values)
-
-    split_point = int(len(wsb_data)*0.9)
-    train_df = wsb_data[0:split_point]
-    dev_df = wsb_data[split_point:]
-
-    print("load train data")
-    train_data = WSBData(wsb_file_path, dataframe=train_df, vocab=vocab, train=True)
-    print("load dev data")
-    dev_data = WSBData(wsb_file_path, dataframe=dev_df, vocab=vocab, train=False)
-    print(train_data.vocab.get_vocab_size())
-    if device == "gpu":
-        device = torch.device('cuda:0')
-        attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350).cuda()
-        X = train_data.XwordList
-        Y = train_data.Y
-        losses, accuracies = train_network(attn_model, X, Y, 2, dev_data, batchSize=50, device = device)
-        print(accuracies)
-        # train_model(attn_model, X, Y, 1, dev_data, use_cuda=True)
-    else:
-        device = torch.device('cpu')
-        attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350)
-        X = train_data.XwordList
-        Y = train_data.Y
-        losses, accuracies = train_network(attn_model, X, Y, 2, dev_data, batchSize=50, device = device)
-        print(accuracies)
-        # train_model(attn_model, X, Y, 1, dev_data, use_cuda=False)
-
-    if save_model:
-        torch.save(attn_model.state_dict(), "saved_models/nbow.pth")
+# def main_attention():
+#     args = parse_args()
+#     wsb_file_path = args.wsb_csv_file
+#     device = args.device
+#     save_model = args.save_model
+#     wsb_data = load_csv(wsb_file_path)
+#     vocab = create_vocab(wsb_data['title'].values)
+#
+#     split_point = int(len(wsb_data)*0.9)
+#     train_df = wsb_data[0:split_point]
+#     dev_df = wsb_data[split_point:]
+#
+#     print("load train data")
+#     train_data = WSBData(wsb_file_path, dataframe=train_df, vocab=vocab, train=True)
+#     print("load dev data")
+#     dev_data = WSBData(wsb_file_path, dataframe=dev_df, vocab=vocab, train=False)
+#     print(train_data.vocab.get_vocab_size())
+#     if device == "gpu":
+#         device = torch.device('cuda:0')
+#         attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350).cuda()
+#         X = train_data.XwordList
+#         Y = train_data.Y
+#         losses, accuracies = train_network(attn_model, X, Y, 2, dev_data, batchSize=50, device = device)
+#         print(accuracies)
+#         # train_model(attn_model, X, Y, 1, dev_data, use_cuda=True)
+#     else:
+#         device = torch.device('cpu')
+#         attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350)
+#         X = train_data.XwordList
+#         Y = train_data.Y
+#         losses, accuracies = train_network(attn_model, X, Y, 2, dev_data, batchSize=50, device = device)
+#         print(accuracies)
+#         # train_model(attn_model, X, Y, 1, dev_data, use_cuda=False)
+#
+#     if save_model:
+#         torch.save(attn_model.state_dict(), "saved_models/nbow.pth")
 
 
 if __name__ == '__main__':
-    main_attention()
+    main()
