@@ -14,7 +14,7 @@ from scipy.sparse import csr_matrix
 import numpy as np
 from collections import Counter
 
-from data_crawler import DataLoader
+from data import DataLoader
 
 
 class Vocab():
@@ -76,21 +76,22 @@ def load_csv(csv_file_path):
 	return wsb_data
 
 
-class WSBdata(DataLoader):
+class WSBData():
 	def __init__(self, csv_file_path, dataframe=None, vocab=None, train=True):
 		""" Reads in data into sparse matrix format """
-		super(WSBdata, self).__init__(csv_file_path, dataframe=dataframe)
-		self.get_stats()
-
 		if not vocab:
 			self.vocab = Vocab()
 		else:
 			self.vocab = vocab
 
-		if dataframe is None:
-			dataframe = self.wsb_data
+		if dataframe is not None:
+			self.dataframe = dataframe 
+		else:
+			self.dataframe = pd.read_csv(csv_file_path)
+		
+		rows = self.dataframe.shape[0]
 
-		rows = dataframe.shape[0]
+		self.get_stats_wsb()
 
 		# if train:
 		# 	dataframe = dataframe.iloc[rows//4:, :]
@@ -141,31 +142,6 @@ class WSBdata(DataLoader):
 				Y.append(3)
 			elif sentiment_value == "very-bullish":
 				Y.append(4)
-			# for line in row[0]:
-			# 	wordList = [self.vocab.get_id(w.lower()) for w in word_tokenize(line) if self.vocab.get_id(w.lower()) >= 0]
-			# 	if len(wordList) == 0:
-			# 		continue
-			# 	XwordList.append(wordList)
-			# 	XfileList.append(row[0])
-			# 	wordCounts = Counter(wordList)
-			# 	for (wordId, count) in wordCounts.items():
-			# 		if wordId >= 0:
-			# 			X_row_indices.append(len(row[0])+i)
-			# 			X_col_indices.append(wordId)
-			# 			X_values.append(count)
-			#
-			# 	sentiment_value = self.sentiment_function(row)
-			#
-			# 	if sentiment_value == "very-bearish":
-			# 		Y.append(0.0)
-			# 	elif sentiment_value == "bearish":
-			# 		Y.append(1.0)
-			# 	elif sentiment_value == "neutral":
-			# 		Y.append(2.0)
-			# 	elif sentiment_value == "bullish":
-			# 		Y.append(3.0)
-			# 	elif sentiment_value == "very-bullish":
-			# 		Y.append(4.0)
 
 
 		self.vocab.lock()
@@ -212,6 +188,117 @@ class WSBdata(DataLoader):
 		else:
 			return "very-bullish"
 
+	def get_stats_wsb(self, plot=False):
+		score = self.dataframe.iloc[:, 1].to_numpy()
+		comments = self.dataframe.iloc[:, 2].to_numpy()
+
+		score = np.log(score)
+		comments = np.log(comments)
+
+
+		theta1 = .5
+		theta2 = .5
+		func = theta1 * score + theta2 * comments
+
+
+		## all pareto distributions which really shouldn't come as too
+		## much of a surprise --
+		if plot:
+			hist1 = plt.hist(score, bins=100, range=(0, 500))
+			hist2 = plt.hist(comments, bins=100, range=(0, 500))
+			plt.show()
+
+		score_percentiles = []
+		comment_percentiles = []
+		func_percentiles = []
+		for perc in range(0, 100, 20):
+			s_perc = np.percentile(score, perc)
+			c_perc = np.percentile(comments, perc)
+			f_perc = np.percentile(func, perc)
+			score_percentiles.append(s_perc)
+			comment_percentiles.append(c_perc)
+			func_percentiles.append(f_perc)
+
+		self.score_percentiles = score_percentiles
+		self.comment_percentiles = comment_percentiles
+		self.func_percentiles = func_percentiles
+
+
+
+
+class TwitterData(DataLoader): 
+	def __init__(self, csv_file_path, dataframe=None, vocab=None, train=True):
+		""" Reads in data into sparse matrix format """
+		super(TwitterData, self).__init__(csv_file_path, dataframe=dataframe)
+
+		# Right now there is a mess of refferring to the dataloader object and 
+		# just importing the csv in general -- i'll see how much we need the 
+		# data loader script (important for stats about WSB data and additonally
+		# if we decide to make an API call to scrape data (little less likely))
+
+		if not vocab:
+			self.vocab = Vocab()
+		else:
+			self.vocab = vocab
+
+		if dataframe is not None:
+			self.dataframe = dataframe
+		else:
+			self.dataframe = pd.read_csv(csv_file_path)
+
+
+		rows = self.dataframe.shape[0]
+
+		X_values = []
+		X_row_indices = []
+		X_col_indices = []
+		Y = []
+
+		XwordList = []
+		XfileList = []
+
+		#Read entries
+		for i in tqdm(range(len(self.dataframe))):
+			row = self.dataframe.iloc[i, :]
+			title = row[0]
+			wordlist = []
+			tokenized_title = word_tokenize(title)
+			for w in tokenized_title:
+				id = self.vocab.get_id(w.lower())
+				if id >= 0:
+					wordlist.append(id)
+
+			if len(wordlist) == 0:
+				continue
+			XwordList.append(wordlist)
+			XfileList.append(row[0])
+			wordCounts = Counter(wordlist)
+			for (wordId, count) in wordCounts.items():
+				if wordId >= 0:
+					X_row_indices.append(len(row[0])+i)
+					X_col_indices.append(wordId)
+					X_values.append(count)
+
+			Y.append(row[1])
+
+
+		self.vocab.lock()
+
+		#Create a sparse matrix in csr format
+		# self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.get_vocab_size()))
+		self.Y = np.asarray(Y)
+		print(self.Y.shape)
+		print(len(XwordList))
+		#Randomly shuffle
+		index = np.arange(len(XwordList))
+		# print(self.X.shape)
+		# index = np.arange(self.X.shape[0])
+		np.random.shuffle(index)
+		# self.X = self.X[index,:]
+		self.XwordList = [torch.LongTensor(XwordList[i]) for i in index]  #Two different sparse formats, csr and lists of IDs (XwordList).
+		self.XfileList = [XfileList[i] for i in index]
+		self.Y = self.Y[index]
+
 
 if __name__ == '__main__':
-	test = WSBdata()
+	test = TwitterData("../data/twitter_data.csv")
