@@ -191,8 +191,8 @@ class WSBdata(DataLoader):
 		score = df_row[1]
 		comments = df_row[2]
 
-		theta1 = 0.5
-		theta2 = 0.5
+		theta1 = 0.75
+		theta2 = 0.25
 
 		sentiment = theta1*score + theta2*comments
 
