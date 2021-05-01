@@ -7,6 +7,8 @@ nltk.download('punkt')
 from tqdm import tqdm
 import torch
 import pandas as pd
+from pandas.tseries.offsets import BDay
+from datetime import datetime, timedelta, date
 
 
 
@@ -14,7 +16,6 @@ from scipy.sparse import csr_matrix
 import numpy as np
 from collections import Counter
 
-from data import DataLoader
 
 
 class Vocab():
@@ -67,13 +68,15 @@ def create_vocab(wsb_data):
     vocab.lock()
     return vocab
 
-def load_csv(csv_file_path):
-	data = pd.read_csv(csv_file_path, delimiter=",")
-	title = data['title'].values
-	upvotes = data['score'].values
-	comment_num = data['comms_num'].values
-	wsb_data = pd.DataFrame({'title':title, 'score':upvotes, 'comms_num':comment_num})
-	return wsb_data
+def load_csv(csv_file_path, type_=None):
+	if type_ == "reddit" or type_ == None:
+		data = pd.read_csv(csv_file_path, delimiter=",")
+		data = data[["title", "score", "comms_num", "timestamp"]]
+	
+	if type_ == "twitter": 
+		data = pd.read_csv(csv_file_path, delimiter=",")
+
+	return data
 
 
 class WSBData():
@@ -211,7 +214,7 @@ class WSBData():
 		score_percentiles = []
 		comment_percentiles = []
 		func_percentiles = []
-		for perc in range(0, 100, 20):
+		for perc in range(0, 100, 00):
 			s_perc = np.percentile(score, perc)
 			c_perc = np.percentile(comments, perc)
 			f_perc = np.percentile(func, perc)
@@ -224,18 +227,9 @@ class WSBData():
 		self.func_percentiles = func_percentiles
 
 
-
-
-class TwitterData(DataLoader): 
+class TwitterData(): 
 	def __init__(self, csv_file_path, dataframe=None, vocab=None, train=True):
 		""" Reads in data into sparse matrix format """
-		super(TwitterData, self).__init__(csv_file_path, dataframe=dataframe)
-
-		# Right now there is a mess of refferring to the dataloader object and 
-		# just importing the csv in general -- i'll see how much we need the 
-		# data loader script (important for stats about WSB data and additonally
-		# if we decide to make an API call to scrape data (little less likely))
-
 		if not vocab:
 			self.vocab = Vocab()
 		else:
@@ -300,5 +294,113 @@ class TwitterData(DataLoader):
 		self.Y = self.Y[index]
 
 
+class WSBDataLarge():
+	def __init__(self, csv_file_path, dataframe=None, vocab=None, train=True):
+		""" Reads in data into sparse matrix format """
+		if not vocab:
+			self.vocab = Vocab()
+		else:
+			self.vocab = vocab
+
+		if dataframe is not None:
+			self.dataframe = dataframe 
+		else:
+			self.dataframe = pd.read_csv(csv_file_path)
+		
+		rows = self.dataframe.shape[0]
+
+		self.stock_price(pd.read_csv("../data/GME.csv"))
+
+
+		#self.dataframe["Date"] = pd.to_datetime(dataframe["Date"], format='%Y-%m-%d %H:%M:%S')
+
+		
+		self.dataframe["timestamp"] = pd.to_datetime(self.dataframe["timestamp"], format='%Y-%m-%d %H:%M:%S')
+		
+		isBusinessday = BDay().onOffset
+		match_series = self.dataframe["timestamp"].map(isBusinessday)
+		self.dataframe = self.dataframe[match_series]
+
+		X_values = []
+		X_row_indices = []
+		X_col_indices = []
+		Y = []
+
+		XwordList = []
+		XfileList = []
+
+		#Read entries
+		for i in tqdm(range(len(self.dataframe))):
+			row = self.dataframe.iloc[i, :]
+			title = row[0]
+			wordlist = []
+			tokenized_title = word_tokenize(title)
+			for w in tokenized_title:
+				id = self.vocab.get_id(w.lower())
+				if id >= 0:
+					wordlist.append(id)
+
+			# wordList = [self.vocab.get_id(w.lower()) for w in word_tokenize(title) if self.vocab.get_id(w.lower()) >= 0]
+			if len(wordlist) == 0:
+				continue
+			XwordList.append(wordlist)
+			XfileList.append(row[0])
+			wordCounts = Counter(wordlist)
+			for (wordId, count) in wordCounts.items():
+				if wordId >= 0:
+					X_row_indices.append(len(row[0])+i)
+					X_col_indices.append(wordId)
+					X_values.append(count)
+
+			### Add Y logic 
+
+			reddit_date = row[-1] + timedelta(days=1)
+			str_time = reddit_date.strftime('%m') + '-' + reddit_date.strftime('%d') 
+			# print(str_time)
+			# print(self.gme_stock_dict)
+			try:
+				Y.append(self.gme_stock_dict[str_time])	
+			except:
+				Y.append(0)
+
+
+
+		self.vocab.lock()
+
+		#Create a sparse matrix in csr format
+		# self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.get_vocab_size()))
+		self.Y = np.asarray(Y)
+		print(self.Y.shape)
+		print(len(XwordList))
+		#Randomly shuffle
+		index = np.arange(len(XwordList))
+		# print(self.X.shape)
+		# index = np.arange(self.X.shape[0])
+		np.random.shuffle(index)
+		# self.X = self.X[index,:]
+		self.XwordList = [torch.LongTensor(XwordList[i]) for i in index]  #Two different sparse formats, csr and lists of IDs (XwordList).
+		self.XfileList = [XfileList[i] for i in index]
+		self.Y = self.Y[index]
+
+
+	def stock_price(self, dataframe):
+		dataframe["Date"] = pd.to_datetime(dataframe["Date"], format='%Y-%m-%d %H:%M:%S')
+		# start_date = min(self.dataframe['timestamp']) not working for some reason
+		start_date = "2021-01-28 00:00:00"
+		df = dataframe[["Date", "Open", "Close"]]
+		df = df[df["Date"] >= start_date]
+		df["Date_str"] = df["Date"].dt.strftime('%m') + '-' + df["Date"].dt.strftime('%d')
+
+		df['Up_Down'] = np.where((df["Close"] - df["Open"]) > 0, 1, -1)
+
+		print(df.head)
+
+		self.gme_stock_dict = pd.Series(df.Up_Down, index=df.Date_str)
+
+
+		return None 
+
+
+
 if __name__ == '__main__':
-	test = TwitterData("../data/twitter_data.csv")
+	test = WSBDataLarge("../data/reddit_data.csv")

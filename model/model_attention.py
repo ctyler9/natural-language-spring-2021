@@ -5,7 +5,6 @@ from vocab import *
 
 
 
-
 class AttentionModel(nn.Module): 
 	def __init__(self, vocab_size, DIM_EMB=300, HID_DIM=300,
 				NUM_CLASSES=5, CONT_DIM=400, dropout=0.5, pad_idx=2):

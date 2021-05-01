@@ -54,7 +54,7 @@ class DataLoader():
 
 
 		## all pareto distributions which really shouldn't come as too
-		## much of a surprise --
+		## much of a surprise -- 
 		if plot:
 			hist1 = plt.hist(score, bins=100, range=(0, 500))
 			hist2 = plt.hist(comments, bins=100, range=(0, 500))
@@ -82,4 +82,4 @@ if __name__ == '__main__':
 	wsb_path = "../data/reddit_wsb.csv"
 	twitter_path = "../data/twitter_data.csv" 
 
-	dl = DataLoader(twitter_path)
+	dl = DataLoader(wsb_path)
