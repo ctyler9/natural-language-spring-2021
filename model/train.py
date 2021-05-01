@@ -164,6 +164,17 @@ def train_network(net, X, Y, num_epochs, dev, lr=0.001, batchSize=50, use_gpu=Fa
 #         net.eval()    #Switch to eval mode
 #         print(f"loss on epoch {epoch} = {total_loss}")
 #         EvalNet(dev, net)
+def plot_accuracy(accuracy_results, model_name):
+    # min_accs, accs, max_accs = accuracy_results
+    plt.figure()
+    plt.plot(accuracy_results, 'ro-')
+    # plt.plot(min_accs, 'bo-', label="min_accuracy")
+    # plt.plot(max_accs, 'go-', label="max_accuracy")
+    plt.title("Reddit WSB Sentiment Accuracy: " + model_name)
+    plt.xlabel("Epochs")
+    plt.ylabel("Validation Accuracy")
+    # plt.legend()
+    plt.show()
 
 def main():
     args = parse_args()
@@ -184,23 +195,27 @@ def main():
     print(train_data.vocab.get_vocab_size())
     if device == "gpu":
         device = torch.device('cuda:0')
-        nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350).cuda()
+        nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300).cuda()
         X = train_data.XwordList
         Y = train_data.Y
-        losses, accuracies = train_network(nbow_model, X, Y, 2, dev_data, batchSize=50, device = device)
+        losses, accuracies = train_network(nbow_model, X, Y, 12, dev_data, lr=0.055, batchSize=100, device = device)
         print(accuracies)
         # train_model(nbow_model, X, Y, 1, dev_data, use_cuda=True)
     else:
         device = torch.device('cpu')
-        nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350)
+        nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300)
         X = train_data.XwordList
         Y = train_data.Y
-        losses, accuracies = train_network(nbow_model, X, Y, 2, dev_data, batchSize=50, device = device)
+        losses, accuracies = train_network(nbow_model, X, Y, 12, dev_data, batchSize=150, device = device)
         print(accuracies)
         # train_model(nbow_model, X, Y, 1, dev_data, use_cuda=False)
 
     if save_model:
         torch.save(nbow_model.state_dict(), "saved_models/nbow.pth")
+<<<<<<< HEAD
+    plot_accuracy(accuracies, "CNN-Sentiment")
+    np.save("cnn-sentiment-accuracy.npy", np.array(accuracies))
+=======
 
 
 
@@ -243,5 +258,6 @@ def main_attention():
 
 
 
+>>>>>>> 266499ce68bb47b91c1931bc54d8bc421d47d405
 if __name__ == '__main__':
     main_attention()

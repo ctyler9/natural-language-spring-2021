@@ -22,7 +22,7 @@ class NBOW(nn.Module):
         self.conv2 = nn.Conv1d(DIM_EMB, 700, 4)
         self.conv3 = nn.Conv1d(DIM_EMB, 700, 5)
         self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(p=0.55)
+        self.dropout = nn.Dropout(p=0.65)
         self.linear1 = nn.Linear(2100, NUM_CLASSES)
         # self.linear2 = nn.Linear(10, NUM_CLASSES)
         self.log_softmax = nn.LogSoftmax(dim=1)
