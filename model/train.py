@@ -129,41 +129,6 @@ def train_network(net, X, Y, num_epochs, dev, lr=0.001, batchSize=50, use_gpu=Fa
     print("Finished Training")
     return epoch_losses, eval_accuracy
 
-# def train_model(net, X, Y, n_iter, dev, batch_size=50, num_classes=5, use_cuda=False):
-#     print("Start Training!")
-#     #TODO: initialize optimizer.
-#     optimizer = optim.Adam(net.parameters(), lr=0.001)
-#     loss_func = nn.CrossEntropyLoss()
-#
-#     for epoch in range(n_iter):
-#         num_correct = 0
-#         total_loss = 0.0
-#         net.train()   #Put the network into training mode
-#         for i in tqdm(range(len(X))):
-#             x_sample = X[i]
-#             if use_cuda:
-#                 x_sample = x_sample.cuda()
-#
-#             Y_sample = int(Y[i])
-#
-#             net.zero_grad()
-#             logProbs = net.forward(x_sample)
-#
-#             input_ = logProbs.view(1,-1)
-#             if use_cuda:
-#                 target = torch.LongTensor(np.array([Y_sample])).cuda()
-#             else:
-#                 target = torch.LongTensor(np.array([Y_sample]))
-#
-#             loss = loss_func(input_, target)
-#             loss.backward()
-#             total_loss += float(loss.detach().item())
-#             optimizer.step()
-#
-#
-#         net.eval()    #Switch to eval mode
-#         print(f"loss on epoch {epoch} = {total_loss}")
-#         EvalNet(dev, net)
 def plot_accuracy(accuracy_results, model_name):
     # min_accs, accs, max_accs = accuracy_results
     plt.figure()
@@ -212,10 +177,8 @@ def main():
 
     if save_model:
         torch.save(nbow_model.state_dict(), "saved_models/nbow.pth")
-<<<<<<< HEAD
     plot_accuracy(accuracies, "CNN-Sentiment")
     np.save("cnn-sentiment-accuracy.npy", np.array(accuracies))
-=======
 
 
 
@@ -257,7 +220,5 @@ def main_attention():
         torch.save(attn_model.state_dict(), "saved_models/nbow.pth")
 
 
-
->>>>>>> 266499ce68bb47b91c1931bc54d8bc421d47d405
 if __name__ == '__main__':
     main_attention()
