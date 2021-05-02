@@ -43,6 +43,7 @@ def eval_network(data, net, use_gpu=False, batch_size=25, device=torch.device('c
         batch_x = pad_batch_input(X[batch:batch + batch_size], device=device)
         batch_y = torch.tensor(Y[batch:batch + batch_size], device=device)
         batch_y_hat = net.forward(batch_x)
+        print(batch_y)
         if isinstance(net, AttentionModel):
             batch_y_hat = batch_y_hat[0]
         predictions = batch_y_hat.argmax(dim=1)
@@ -139,7 +140,7 @@ def main():
     wsb_data = load_csv(wsb_file_path)
     vocab = create_vocab(wsb_data['title'].values)
     data = WSBData(wsb_file_path, dataframe=wsb_data, vocab=vocab)
-
+    print(vocab.get_vocab_size())
     # split_point = int(len(wsb_data)*0.9)
     # train_df = wsb_data[0:split_point]
     # dev_df = wsb_data[split_point:]
@@ -155,13 +156,13 @@ def main():
         X_train = data.XwordList[0:split_point]
         Y_train = data.Y[0:split_point]
         X_dev = data.XwordList[split_point:]
-        Y_dev = data.Y[split_point:0]
+        Y_dev = data.Y[split_point:]
         dev_data = (X_dev, Y_dev)
 
         if model_type == "nbow":
-            model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300).cuda()
+            model = NBOW(vocab.get_vocab_size(), DIM_EMB=300).cuda()
         elif model_type == "attention":
-            model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=310, HID_DIM=300).cuda()
+            model = AttentionModel(vocab.get_vocab_size(), DIM_EMB=310, HID_DIM=300).cuda()
 
         # X = train_data.XwordList
         # Y = train_data.Y
@@ -173,14 +174,14 @@ def main():
         X_train = data.XwordList[0:split_point]
         Y_train = data.Y[0:split_point]
         X_dev = data.XwordList[split_point:]
-        Y_dev = data.Y[split_point:0]
+        Y_dev = data.Y[split_point:]
         dev_data = (X_dev, Y_dev)
         device = torch.device('cpu')
         # nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300)
         if model_type == "nbow":
-            model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300).cuda()
+            model = NBOW(vocab.get_vocab_size(), DIM_EMB=300).cuda()
         elif model_type == "attention":
-            model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350, HID_DIM=400).cuda()
+            model = AttentionModel(vocab.get_vocab_size(), DIM_EMB=350, HID_DIM=400).cuda()
 
 
         # X = train_data.XwordList
