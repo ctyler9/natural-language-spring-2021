@@ -129,6 +129,58 @@ def plot_accuracy(accuracy_results, model_name):
     # plt.legend()
     plt.show()
 
+def nbow(device_type, save_model):
+    reddit_path = "../data/reddit_wsb.csv"
+    twitter_path = "../data/twitter_data.csv"
+    path = reddit_path
+    device = "gpu"
+    save_model = True
+    if path == "../data/reddit_wsb.csv":
+      data = load_csv(path, "reddit")
+      vocab = create_vocab(data['title'].values)
+    if path == "../data/twitter_data.csv":
+      data = load_csv(path, "twitter")
+      vocab = create_vocab(data['Text'].values)
+
+    split_point = int(len(data)*0.9)
+    train_df = data[0:split_point]
+    dev_df = data[split_point:]
+
+    print("load train data")
+    if path == "../data/reddit_wsb.csv":
+      train_data = WSBDataLarge(path, dataframe=train_df, vocab=vocab, train=True)
+      print("load dev data")
+      dev_data = WSBDataLarge(path, dataframe=dev_df, vocab=vocab, train=False)
+      print(train_data.vocab.get_vocab_size())
+    if path == "../data/twitter_data.csv":
+      train_data = TwitterData(path, dataframe=train_df, vocab=vocab, train=True)
+      print("load dev data")
+      dev_data = TwitterData(path, dataframe=dev_df, vocab=vocab, train=False)
+      print(train_data.vocab.get_vocab_size())
+
+    if device_type == "gpu":
+        device = torch.device('cuda:0')
+        nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350).cuda()
+        X = train_data.XwordList
+        Y = train_data.Y
+        losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=50, device = device)
+        print(accuracies)
+        # train_model(nbow_model, X, Y, 1, dev_data, use_cuda=True)
+    else:
+        device = torch.device('cpu')
+        nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350)
+        X = train_data.XwordList
+        Y = train_data.Y
+        losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=50, device = device)
+        print(accuracies)
+        # train_model(nbow_model, X, Y, 1, dev_data, use_cuda=False)
+
+    if save_model:
+        torch.save(nbow_model.state_dict(), "nbow.pth")
+    plot_accuracy(accuracies, "CNN LSTM WSB Stock Data")
+    np.save("cnn-sentiment-accuracy-wsb-stock.npy", np.array(accuracies))
+
+
 def attention(device_type, save_model):
     reddit_path = "../data/reddit_wsb.csv"
     twitter_path = "../data/twitter_data.csv"
@@ -185,6 +237,9 @@ def attention(device_type, save_model):
     if save_model:
         torch.save(attn_model.state_dict(), "attention.pth")
 
+    plot_accuracy(accuracies, "Attention LSTM WSB Stock Data")
+    np.save("attention-sentiment-accuracy-wsb-stock.npy", np.array(accuracies))
+
 def main():
     args = parse_args()
     model = args.model_type
@@ -192,6 +247,8 @@ def main():
     save_model = args.save_model
     if model == "attention":
         attention(device_type, save_model)
+    elif model == "nbow":
+        nbow(device_type, save_model)
 
 
 if __name__ == '__main__':
