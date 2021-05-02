@@ -43,7 +43,6 @@ def eval_network(data, net, use_gpu=False, batch_size=25, device=torch.device('c
         batch_x = pad_batch_input(X[batch:batch + batch_size], device=device)
         batch_y = torch.tensor(Y[batch:batch + batch_size], device=device)
         batch_y_hat = net.forward(batch_x)
-        print(batch_y)
         if isinstance(net, AttentionModel):
             batch_y_hat = batch_y_hat[0]
         predictions = batch_y_hat.argmax(dim=1)
@@ -162,7 +161,7 @@ def main():
         if model_type == "nbow":
             model = NBOW(vocab.get_vocab_size(), DIM_EMB=300).cuda()
         elif model_type == "attention":
-            model = AttentionModel(vocab.get_vocab_size(), DIM_EMB=310, HID_DIM=300).cuda()
+            model = AttentionModel(vocab.get_vocab_size(), DIM_EMB=310, HID_DIM=310).cuda()
 
         # X = train_data.XwordList
         # Y = train_data.Y
