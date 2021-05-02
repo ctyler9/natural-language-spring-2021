@@ -314,7 +314,8 @@ class WSBDataLarge():
 
 		rows = self.dataframe.shape[0]
 
-		self.stock_price(pd.read_csv("../data/GME.csv"))
+		stock_df = pd.read_csv("../data/GME.csv")
+		self.stock_price(stock_df)
 
 
 		#self.dataframe["Date"] = pd.to_datetime(dataframe["Date"], format='%Y-%m-%d %H:%M:%S')
@@ -367,7 +368,8 @@ class WSBDataLarge():
 
 			# need to figure out the fix for Friday to Saturday
 			try:
-				Y.append(self.gme_stock_dict[str_time])
+				label = self.gme_stock_dict[str_time]
+				Y.append(label)
 			except:
 				#Y.append(self.gme_stock_dict[str_time_mon])
 				Y.append(0)
@@ -377,6 +379,7 @@ class WSBDataLarge():
 
 		#Create a sparse matrix in csr format
 		# self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.get_vocab_size()))
+		import pdb; pdb.set_trace()
 		self.Y = np.asarray(Y)
 		print(self.Y.shape)
 		print(len(XwordList))
@@ -402,11 +405,7 @@ class WSBDataLarge():
 		df['Up_Down'] = np.where((df["Close"] - df["Open"]) > 0, 1, -1)
 
 		print(df.head)
-
-		self.gme_stock_dict = pd.Series(df.Up_Down, index=df.Date_str)
-
-
-		return None
+		self.gme_stock_dict = pd.Series(df['Up_Down'].values, index=df.Date_str)
 
 
 

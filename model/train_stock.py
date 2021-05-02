@@ -8,17 +8,16 @@ from tqdm import tqdm
 import argparse
 from model import NBOW
 from model_attention import AttentionModel
-from vocab import Vocab, WSBData, load_csv, create_vocab
+from vocab import Vocab, WSBData, WSBDataLarge, load_csv, create_vocab
 import matplotlib.pyplot as plt
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--wsb_csv_file",
-        type=str,
-        required=True,
-    )
+    # parser.add_argument(
+    #     "--wsb_csv_file",
+    #     type=str,
+    #     required=True,
+    # )
     parser.add_argument(
         "--device",
         type=str,
@@ -124,114 +123,73 @@ def plot_accuracy(accuracy_results, model_name):
     plt.plot(accuracy_results, 'ro-')
     # plt.plot(min_accs, 'bo-', label="min_accuracy")
     # plt.plot(max_accs, 'go-', label="max_accuracy")
-    plt.title("Reddit WSB Sentiment Accuracy: " + model_name)
+    plt.title("Reddit WSB+Stock Sentiment Accuracy: " + model_name)
     plt.xlabel("Epochs")
     plt.ylabel("Validation Accuracy")
     # plt.legend()
     plt.show()
 
-def main():
-    args = parse_args()
-    wsb_file_path = args.wsb_csv_file
-    device = args.device
-    save_model = args.save_model
-    model_type = args.model_type
-    wsb_data = load_csv(wsb_file_path)
-    vocab = create_vocab(wsb_data['title'].values)
-    data = WSBData(wsb_file_path, dataframe=wsb_data, vocab=vocab)
-    print(vocab.get_vocab_size())
-    # split_point = int(len(wsb_data)*0.9)
-    # train_df = wsb_data[0:split_point]
-    # dev_df = wsb_data[split_point:]
-    #
-    # print("load train data")
-    # train_data = WSBData(wsb_file_path, dataframe=train_df, vocab=vocab, train=True)
-    # print("load dev data")
-    # dev_data = WSBData(wsb_file_path, dataframe=dev_df, vocab=vocab, train=False)
+def attention(device_type, save_model):
+    reddit_path = "../data/reddit_wsb.csv"
+    twitter_path = "../data/twitter_data.csv"
 
-    if device == "gpu":
+    path = reddit_path
+    device = "gpu"
+    save_model = True
+
+    if path == "../data/reddit_wsb.csv":
+      data = load_csv(path, "reddit")
+      vocab = create_vocab(data['title'].values)
+    if path == "../data/twitter_data.csv":
+      data = load_csv(path, "twitter")
+      vocab = create_vocab(data['Text'].values)
+
+    split_point = int(len(data)*0.9)
+    train_df = data[0:split_point]
+    dev_df = data[split_point:]
+
+    print("load train data")
+    if path == "../data/reddit_wsb.csv":
+      n_classes = 2
+      train_data = WSBDataLarge(path, dataframe=train_df, vocab=vocab, train=True)
+      print("load dev data")
+      dev_data = WSBDataLarge(path, dataframe=dev_df, vocab=vocab, train=False)
+      print(train_data.vocab.get_vocab_size())
+    if path == "../data/twitter_data.csv":
+      n_classes = 2
+      train_data = TwitterData(path, dataframe=train_df, vocab=vocab, train=True)
+      print("load dev data")
+      dev_data = TwitterData(path, dataframe=dev_df, vocab=vocab, train=False)
+      print(train_data.vocab.get_vocab_size())
+
+
+    if device_type == "gpu":
         device = torch.device('cuda:0')
-        split_point = int(len(wsb_data)*0.9)
-        X_train = data.XwordList[0:split_point]
-        Y_train = data.Y[0:split_point]
-        X_dev = data.XwordList[split_point:]
-        Y_dev = data.Y[split_point:]
-        dev_data = (X_dev, Y_dev)
-
-        if model_type == "nbow":
-            model = NBOW(vocab.get_vocab_size(), DIM_EMB=300).cuda()
-        elif model_type == "attention":
-            model = AttentionModel(vocab.get_vocab_size(), DIM_EMB=310, HID_DIM=310).cuda()
-
-        # X = train_data.XwordList
-        # Y = train_data.Y
-        losses, accuracies = train_network(model, X_train, Y_train, 10, dev_data, lr=0.015, batchSize=50, device = device)
+        attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes).cuda()
+        X = train_data.XwordList
+        Y = train_data.Y
+        losses, accuracies = train_network(attn_model, X, Y, 2, dev_data, batchSize=50, device = device, num_classes=n_classes)
         print(accuracies)
-
+        # train_model(attn_model, X, Y, 1, dev_data, use_cuda=True)
     else:
-        split_point = int(len(wsb_data)*0.9)
-        X_train = data.XwordList[0:split_point]
-        Y_train = data.Y[0:split_point]
-        X_dev = data.XwordList[split_point:]
-        Y_dev = data.Y[split_point:]
-        dev_data = (X_dev, Y_dev)
         device = torch.device('cpu')
-        # nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300)
-        if model_type == "nbow":
-            model = NBOW(vocab.get_vocab_size(), DIM_EMB=300).cuda()
-        elif model_type == "attention":
-            model = AttentionModel(vocab.get_vocab_size(), DIM_EMB=350, HID_DIM=400).cuda()
-
-
-        # X = train_data.XwordList
-        # Y = train_data.Y
-        losses, accuracies = train_network(model, X_train, Y_train, 12, dev_data, batchSize=150, device = device)
+        attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes)
+        X = train_data.XwordList
+        Y = train_data.Y
+        losses, accuracies = train_network(attn_model, X, Y, 2, dev_data, batchSize=50, device = device, num_classes=n_classes)
         print(accuracies)
-
-    plot_accuracy(accuracies, model_type + "-Sentiment WSB")
-    np.save(model_type  +"-sentiment-accuracy-wsb.npy", np.array(accuracies))
+        # train_model(attn_model, X, Y, 1, dev_data, use_cuda=False)
 
     if save_model:
-        torch.save(model.state_dict(), "saved_models/" + model_type + ".pth")
+        torch.save(attn_model.state_dict(), "attention.pth")
 
-
-
-# def main_attention():
-#     args = parse_args()
-#     wsb_file_path = args.wsb_csv_file
-#     device = args.device
-#     save_model = args.save_model
-#     wsb_data = load_csv(wsb_file_path)
-#     vocab = create_vocab(wsb_data['title'].values)
-#
-#     split_point = int(len(wsb_data)*0.9)
-#     train_df = wsb_data[0:split_point]
-#     dev_df = wsb_data[split_point:]
-#
-#     print("load train data")
-#     train_data = WSBData(wsb_file_path, dataframe=train_df, vocab=vocab, train=True)
-#     print("load dev data")
-#     dev_data = WSBData(wsb_file_path, dataframe=dev_df, vocab=vocab, train=False)
-#     print(train_data.vocab.get_vocab_size())
-#     if device == "gpu":
-#         device = torch.device('cuda:0')
-#         attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350).cuda()
-#         X = train_data.XwordList
-#         Y = train_data.Y
-#         losses, accuracies = train_network(attn_model, X, Y, 2, dev_data, batchSize=50, device = device)
-#         print(accuracies)
-#         # train_model(attn_model, X, Y, 1, dev_data, use_cuda=True)
-#     else:
-#         device = torch.device('cpu')
-#         attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350)
-#         X = train_data.XwordList
-#         Y = train_data.Y
-#         losses, accuracies = train_network(attn_model, X, Y, 2, dev_data, batchSize=50, device = device)
-#         print(accuracies)
-#         # train_model(attn_model, X, Y, 1, dev_data, use_cuda=False)
-#
-#     if save_model:
-#         torch.save(attn_model.state_dict(), "saved_models/nbow.pth")
+def main():
+    args = parse_args()
+    model = args.model_type
+    device_type = args.device
+    save_model = args.save_model
+    if model == "attention":
+        attention(device_type, save_model)
 
 
 if __name__ == '__main__':
