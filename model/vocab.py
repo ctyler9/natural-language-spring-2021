@@ -379,7 +379,7 @@ class WSBDataLarge():
 
 		#Create a sparse matrix in csr format
 		# self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.get_vocab_size()))
-		
+
 		self.Y = np.asarray(Y)
 		print(self.Y.shape)
 		print(len(XwordList))
@@ -402,7 +402,7 @@ class WSBDataLarge():
 		df = df[df["Date"] >= start_date]
 		df["Date_str"] = df["Date"].dt.strftime('%m') + '-' + df["Date"].dt.strftime('%d')
 
-		df['Up_Down'] = np.where((df["Close"] - df["Open"]) > 0, 1, -1)
+		df['Up_Down'] = np.where((df["Close"] - df["Open"]) > 0, 1, 0)
 
 		print(df.head)
 		self.gme_stock_dict = pd.Series(df['Up_Down'].values, index=df.Date_str)

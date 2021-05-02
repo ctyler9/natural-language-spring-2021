@@ -168,7 +168,8 @@ def attention(device_type, save_model):
         attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes).cuda()
         X = train_data.XwordList
         Y = train_data.Y
-        losses, accuracies = train_network(attn_model, X, Y, 2, dev_data, batchSize=50, device = device, num_classes=n_classes)
+        dev_data = (dev_data.XwordList, dev_data.Y)
+        losses, accuracies = train_network(attn_model, X, Y, 10, dev_data, batchSize=50, device = device, num_classes=n_classes)
         print(accuracies)
         # train_model(attn_model, X, Y, 1, dev_data, use_cuda=True)
     else:
@@ -176,7 +177,8 @@ def attention(device_type, save_model):
         attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes)
         X = train_data.XwordList
         Y = train_data.Y
-        losses, accuracies = train_network(attn_model, X, Y, 2, dev_data, batchSize=50, device = device, num_classes=n_classes)
+        dev_data = (dev_data.XwordList, dev_data.Y)
+        losses, accuracies = train_network(attn_model, X, Y, 10, dev_data, batchSize=50, device = device, num_classes=n_classes)
         print(accuracies)
         # train_model(attn_model, X, Y, 1, dev_data, use_cuda=False)
 
