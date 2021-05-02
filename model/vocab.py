@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, date
 from scipy.sparse import csr_matrix
 import numpy as np
 from collections import Counter
-
+import matplotlib.pyplot as plt
 
 
 class Vocab():
@@ -93,7 +93,7 @@ class WSBData():
 			self.dataframe = pd.read_csv(csv_file_path)
 
 		rows = self.dataframe.shape[0]
-
+		self.lowest_bound = -999999
 		self.get_stats_wsb()
 
 		# if train:
@@ -170,17 +170,19 @@ class WSBData():
 		score = df_row[1]
 		comments = df_row[2]
 
-		theta1 = 0.75
-		theta2 = 0.25
+
+		score = np.log(score + 0.00001)
+		comments = np.log(comments + 0.00001)
+
+		theta1 = 0.50
+		theta2 = 0.50
 
 		sentiment = theta1*score + theta2*comments
-
+		# import pdb; pdb.set_trace()
 		bound1, bound2, bound3, bound4, bound5 = tuple(self.func_percentiles)
 		# know i could have just made it return a number, but thought
 		# i'd keep it string match to get a general concept across
-		if sentiment >= 0 and sentiment < bound1:
-			return 'very-bearish'
-		elif sentiment >= bound1 and sentiment < bound2:
+		if sentiment >= bound1 and sentiment < bound2:
 			return 'bearish'
 		elif sentiment >= bound2 and sentiment < bound3:
 			return 'neutral'
@@ -189,7 +191,7 @@ class WSBData():
 		elif sentiment >= bound4 and sentiment < bound5:
 			return 'very-bullish'
 		else:
-			return "very-bullish"
+			return "very-bearish"
 
 	def get_stats_wsb(self, plot=False):
 		score = self.dataframe.iloc[:, 1].to_numpy()
@@ -199,9 +201,11 @@ class WSBData():
 		comments = np.log(comments + 0.00001)
 
 
-		theta1 = .75
-		theta2 = .25
+		theta1 = .50
+		theta2 = .50
 		func = theta1 * score + theta2 * comments
+		self.lowest_bound = func.min()
+		print(self.lowest_bound)
 
 
 		## all pareto distributions which really shouldn't come as too
@@ -225,6 +229,7 @@ class WSBData():
 		self.score_percentiles = score_percentiles
 		self.comment_percentiles = comment_percentiles
 		self.func_percentiles = func_percentiles
+		print(self.func_percentiles)
 
 
 class TwitterData():
@@ -406,4 +411,38 @@ class WSBDataLarge():
 
 
 if __name__ == '__main__':
-	test = WSBDataLarge("../data/reddit_data.csv")
+	wsb_file_path = "../data/reddit_wsb.csv"
+	wsb_data = load_csv(wsb_file_path)
+	vocab = create_vocab(wsb_data['title'].values)
+
+	split_point = int(len(wsb_data)*0.9)
+	train_df = wsb_data[0:split_point]
+	dev_df = wsb_data[split_point:]
+	print(train_df)
+
+	print("load train data")
+	train_data = WSBData(wsb_file_path, dataframe=train_df, vocab=vocab, train=True)
+	dev_data = WSBData(wsb_file_path, dataframe=dev_df, vocab=vocab, train=False)
+	dev_labels = dev_data.Y
+	dev_unique, dev_counts = np.unique(dev_labels, return_counts=True)
+
+	labels = train_data.Y
+	unique_labels, counts = np.unique(labels, return_counts=True)
+	print(unique_labels)
+	print(counts)
+	plt.figure()
+	plt.bar(unique_labels, counts)
+	# plt.hist(labels, bins=5)
+	plt.title("WSB Training Data Derived Class Distribution")
+	plt.xlabel("Classes")
+	plt.ylabel("Frequency")
+	plt.show()
+
+	plt.figure(1)
+	plt.bar(dev_unique, dev_counts)
+	# plt.hist(labels, bins=5)
+	plt.title("WSB Eval Data Derived Class Distribution")
+	plt.xlabel("Classes")
+	plt.ylabel("Frequency")
+	plt.show()
+	# test = WSBDataLarge("../data/reddit_data.csv")

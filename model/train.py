@@ -9,6 +9,7 @@ import argparse
 from model import NBOW
 from model_attention import AttentionModel
 from vocab import Vocab, WSBData, load_csv, create_vocab
+import matplotlib.pyplot as plt
 
 
 def parse_args():
@@ -29,29 +30,14 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-
-# def EvalNet(data, net, use_cuda=False):
-#     num_correct = 0
-#     X = data.XwordList
-#     Y = data.Y
-#     for i in range(len(X)):
-#         if use_cuda:
-#             input = X[i].cuda()
-#         else:
-#             input = X[i]
-#         logProbs = net.forward(input)
-#         pred = torch.argmax(logProbs).item()
-#         if pred == Y[i]:
-#             num_correct += 1
-#     print("Accuracy: %s" % (float(num_correct) / float(len(X))))
-
-
 def eval_network(data, net, use_gpu=False, batch_size=25, device=torch.device('cpu')):
     print("Evaluation Set")
     num_correct = 0
     # Y = (data.labels + 1.0) / 2.0
-    X = data.XwordList
-    Y = data.Y
+    X = data[0]
+    Y = data[1]
+    # X = data.XwordList
+    # Y = data.Y
     batch_predictions = []
     for batch in tqdm(range(0, len(X), batch_size), leave=False):
         batch_x = pad_batch_input(X[batch:batch + batch_size], device=device)
@@ -152,41 +138,54 @@ def main():
     model_type = args.model_type
     wsb_data = load_csv(wsb_file_path)
     vocab = create_vocab(wsb_data['title'].values)
+    data = WSBData(wsb_file_path, dataframe=wsb_data, vocab=vocab)
 
-    split_point = int(len(wsb_data)*0.9)
-    train_df = wsb_data[0:split_point]
-    dev_df = wsb_data[split_point:]
+    # split_point = int(len(wsb_data)*0.9)
+    # train_df = wsb_data[0:split_point]
+    # dev_df = wsb_data[split_point:]
+    #
+    # print("load train data")
+    # train_data = WSBData(wsb_file_path, dataframe=train_df, vocab=vocab, train=True)
+    # print("load dev data")
+    # dev_data = WSBData(wsb_file_path, dataframe=dev_df, vocab=vocab, train=False)
 
-    print("load train data")
-    train_data = WSBData(wsb_file_path, dataframe=train_df, vocab=vocab, train=True)
-    print("load dev data")
-    dev_data = WSBData(wsb_file_path, dataframe=dev_df, vocab=vocab, train=False)
-    print(train_data.vocab.get_vocab_size())
     if device == "gpu":
         device = torch.device('cuda:0')
+        split_point = int(len(wsb_data)*0.9)
+        X_train = data.XwordList[0:split_point]
+        Y_train = data.Y[0:split_point]
+        X_dev = data.XwordList[split_point:]
+        Y_dev = data.Y[split_point:0]
+        dev_data = (X_dev, Y_dev)
 
         if model_type == "nbow":
             model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300).cuda()
         elif model_type == "attention":
-            model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350).cuda()
+            model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=310, HID_DIM=300).cuda()
 
-        X = train_data.XwordList
-        Y = train_data.Y
-        losses, accuracies = train_network(model, X, Y, 12, dev_data, lr=0.055, batchSize=100, device = device)
+        # X = train_data.XwordList
+        # Y = train_data.Y
+        losses, accuracies = train_network(model, X_train, Y_train, 10, dev_data, lr=0.015, batchSize=50, device = device)
         print(accuracies)
 
     else:
+        split_point = int(len(wsb_data)*0.9)
+        X_train = data.XwordList[0:split_point]
+        Y_train = data.Y[0:split_point]
+        X_dev = data.XwordList[split_point:]
+        Y_dev = data.Y[split_point:0]
+        dev_data = (X_dev, Y_dev)
         device = torch.device('cpu')
         # nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300)
         if model_type == "nbow":
             model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300).cuda()
         elif model_type == "attention":
-            model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350).cuda()
+            model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350, HID_DIM=400).cuda()
 
 
-        X = train_data.XwordList
-        Y = train_data.Y
-        losses, accuracies = train_network(model, X, Y, 12, dev_data, batchSize=150, device = device)
+        # X = train_data.XwordList
+        # Y = train_data.Y
+        losses, accuracies = train_network(model, X_train, Y_train, 12, dev_data, batchSize=150, device = device)
         print(accuracies)
 
     plot_accuracy(accuracies, model_type + "-Sentiment WSB")

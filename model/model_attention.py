@@ -7,7 +7,7 @@ from vocab import *
 
 class AttentionModel(nn.Module):
 	def __init__(self, vocab_size, DIM_EMB=300, HID_DIM=300,
-				NUM_CLASSES=5, CONT_DIM=400, dropout=0.5, pad_idx=2):
+				NUM_CLASSES=5, CONT_DIM=400, dropout=0.5, pad_idx=0):
 
 		super().__init__()
 
@@ -30,17 +30,17 @@ class AttentionModel(nn.Module):
 
 	def forward(self, x, seq_lens=None):
 
-		embeds = self.embedding(x)
+		embeds = self.dropout(self.embedding(x))
 
-		if seq_lens is not None:
-			packed_embeds = nn.utils.rnn.packed_embeds(embeds, seq_lens, batch_first=True)
-			embeds = packed_embeds.clone()
+		# if seq_lens is not None:
+		# 	packed_embeds = nn.utils.rnn.packed_embeds(embeds, seq_lens, batch_first=True)
+		# 	embeds = packed_embeds.clone()
 
 
 		enc, (h_n, c_n) = self.lstm(embeds)
 
-		if seq_lens is not None:
-			enc, _ = nn.utils.rnn.packed_sequence(enc, batch_first=True)
+		# if seq_lens is not None:
+		# 	enc, _ = nn.utils.rnn.packed_sequence(enc, batch_first=True)
 
 		u_it = torch.tanh(self.ui(enc))
 		weights = torch.softmax(u_it.matmul(self.uw), dim=1).unsqueeze(1)
@@ -48,9 +48,9 @@ class AttentionModel(nn.Module):
 
 		logits = self.fc(sent)
 		logits = self.log_softmax(logits)
-		preds = logits.argmax(-1)
+		# preds = logits.argmax(-1)
 
-		return logits, weights, preds
+		return logits, weights
 
 
 def main():
