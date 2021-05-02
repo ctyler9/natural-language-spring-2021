@@ -379,7 +379,7 @@ class WSBDataLarge():
 
 		#Create a sparse matrix in csr format
 		# self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.get_vocab_size()))
-		import pdb; pdb.set_trace()
+		
 		self.Y = np.asarray(Y)
 		print(self.Y.shape)
 		print(len(XwordList))
