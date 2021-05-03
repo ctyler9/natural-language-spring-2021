@@ -28,8 +28,8 @@ class AttentionModel(nn.Module):
 		self.relu = nn.ReLU()
 
 		# output
-		self.fc1 = nn.Linear(2*HID_DIM, HID_DIM)
-		self.fc = nn.Linear(HID_DIM, NUM_CLASSES)
+		# self.fc1 = nn.Linear(2*HID_DIM, HID_DIM)
+		self.fc = nn.Linear(2*HID_DIM, NUM_CLASSES)
 		self.log_softmax = nn.LogSoftmax(dim=1)
 
 
@@ -49,15 +49,15 @@ class AttentionModel(nn.Module):
 		# u_it = self.relu(self.ui(enc))
 		u_it = self.tan_h(self.ui(enc))
 
-		
+
 		weights = torch.softmax(u_it.matmul(self.uw), dim=1).unsqueeze(1)
 		sent = torch.sum(weights.matmul(enc), dim=1)
 
 
 
-		fc1_out = self.fc1(sent)
-		logits = self.fc(fc1_out)
-		# logits = self.fc(sent)
+		# fc1_out = self.fc1(sent)
+		# logits = self.fc(fc1_out)
+		logits = self.fc(sent)
 		logits = self.log_softmax(logits)
 		# preds = logits.argmax(-1)
 
