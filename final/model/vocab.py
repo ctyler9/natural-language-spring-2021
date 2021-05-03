@@ -324,15 +324,14 @@ class WSBDataStock():
 				except:
 					print(str_time)
 					#Y.append(self.gme_up_down[str_time_mon])
-					Y.append(0)
+					Y.append(np.random.choice([0, 1]))
 
 			if self.label_type == "volitility": 
 				try:
 					label = self.gme_volitility[str_time]
 					Y.append(label)
 				except:
-					aset.add(str_time)
-					Y.append(0)
+					Y.append(np.random.choice(["low", "medium", "high"]))
 
 
 		print(aset)
@@ -386,7 +385,7 @@ if __name__ == '__main__':
 	vocab = create_vocab(wsb_data['title'].values)
 
 	split_point = int(len(wsb_data)*0.9)
-	train_df = wsb_data[0:split_point]
+	train_df = wsb_data[0:split_point] 
 	dev_df = wsb_data[split_point:]
 	print(train_df)
 
