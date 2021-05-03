@@ -11,6 +11,7 @@ from model_attention import AttentionModel
 from vocab import Vocab, WSBData, load_csv, create_vocab
 import matplotlib.pyplot as plt
 
+torch.autograd.set_detect_anomaly(True)
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -156,16 +157,20 @@ def main():
         Y_train = data.Y[0:split_point]
         X_dev = data.XwordList[split_point:]
         Y_dev = data.Y[split_point:]
+
+        n_classes = len(set(Y_dev))
+        print(n_classes)
+
         dev_data = (X_dev, Y_dev)
 
         if model_type == "nbow":
-            model = NBOW(vocab.get_vocab_size(), DIM_EMB=300).cuda()
+            model = NBOW(vocab.get_vocab_size(), DIM_EMB=310, NUM_CLASSES=n_classes).cuda()
         elif model_type == "attention":
-            model = AttentionModel(vocab.get_vocab_size(), DIM_EMB=310, HID_DIM=310).cuda()
+            model = AttentionModel(vocab.get_vocab_size(), DIM_EMB=310, HID_DIM=310, NUM_CLASSES=n_classes).cuda()
 
         # X = train_data.XwordList
         # Y = train_data.Y
-        losses, accuracies = train_network(model, X_train, Y_train, 10, dev_data, lr=0.015, batchSize=50, device = device)
+        losses, accuracies = train_network(model, X_train, Y_train, 10, dev_data, lr=0.0055, batchSize=50, num_classes=n_classes, device = device)
         print(accuracies)
 
     else:
@@ -175,17 +180,19 @@ def main():
         X_dev = data.XwordList[split_point:]
         Y_dev = data.Y[split_point:]
         dev_data = (X_dev, Y_dev)
+        n_classes = len(set(Y_dev))
+        print(n_classes)
         device = torch.device('cpu')
         # nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=300)
         if model_type == "nbow":
-            model = NBOW(vocab.get_vocab_size(), DIM_EMB=300).cuda()
+            model = NBOW(vocab.get_vocab_size(), DIM_EMB=300, NUM_CLASSES=n_classes).cuda()
         elif model_type == "attention":
-            model = AttentionModel(vocab.get_vocab_size(), DIM_EMB=350, HID_DIM=400).cuda()
+            model = AttentionModel(vocab.get_vocab_size(), DIM_EMB=350, HID_DIM=300, NUM_CLASSES = n_classes).cuda()
 
 
         # X = train_data.XwordList
         # Y = train_data.Y
-        losses, accuracies = train_network(model, X_train, Y_train, 12, dev_data, batchSize=150, device = device)
+        losses, accuracies = train_network(model, X_train, Y_train, 10, dev_data, batchSize=150, num_classes=n_classes, device = device)
         print(accuracies)
 
     plot_accuracy(accuracies, model_type + "-Sentiment WSB")

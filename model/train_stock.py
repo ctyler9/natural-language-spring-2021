@@ -158,9 +158,10 @@ def nbow(device_type, save_model):
       dev_data = TwitterData(path, dataframe=dev_df, vocab=vocab, train=False)
       print(train_data.vocab.get_vocab_size())
 
+    n_classes = 2
     if device_type == "gpu":
         device = torch.device('cuda:0')
-        nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350).cuda()
+        nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes).cuda()
         X = train_data.XwordList
         Y = train_data.Y
         losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=50, device = device)
@@ -168,7 +169,7 @@ def nbow(device_type, save_model):
         # train_model(nbow_model, X, Y, 1, dev_data, use_cuda=True)
     else:
         device = torch.device('cpu')
-        nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350)
+        nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes)
         X = train_data.XwordList
         Y = train_data.Y
         losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=50, device = device)
@@ -178,7 +179,7 @@ def nbow(device_type, save_model):
     if save_model:
         torch.save(nbow_model.state_dict(), "nbow.pth")
     plot_accuracy(accuracies, "CNN LSTM WSB Stock Data")
-    np.save("cnn-sentiment-accuracy-wsb-stock.npy", np.array(accuracies))
+    np.save("results/cnn-sentiment-accuracy-wsb-stock.npy", np.array(accuracies))
 
 
 def attention(device_type, save_model):
@@ -238,7 +239,7 @@ def attention(device_type, save_model):
         torch.save(attn_model.state_dict(), "attention.pth")
 
     plot_accuracy(accuracies, "Attention LSTM WSB Stock Data")
-    np.save("attention-sentiment-accuracy-wsb-stock.npy", np.array(accuracies))
+    np.save("results/attention-sentiment-accuracy-wsb-stock.npy", np.array(accuracies))
 
 def main():
     args = parse_args()

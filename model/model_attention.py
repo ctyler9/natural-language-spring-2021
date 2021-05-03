@@ -14,6 +14,7 @@ class AttentionModel(nn.Module):
 		self.HID_DIM = HID_DIM
 
 		# core
+		self.pad_idx = pad_idx
 		self.embedding = nn.Embedding(vocab_size, DIM_EMB, padding_idx=pad_idx)
 		self.dropout = nn.Dropout(p=dropout)
 		self.lstm = nn.LSTM(bidirectional=True, num_layers=2, input_size=DIM_EMB,
@@ -33,22 +34,26 @@ class AttentionModel(nn.Module):
 
 
 	def forward(self, x, seq_lens=None):
-
+		source_lengths = torch.sum(x != self.pad_idx, axis=1).cpu()
+		seq_lens = source_lengths
 		embeds = self.dropout(self.embedding(x))
 
 		# if seq_lens is not None:
-		# 	packed_embeds = nn.utils.rnn.packed_embeds(embeds, seq_lens, batch_first=True)
-		# 	embeds = packed_embeds.clone()
-
-
-		enc, (h_n, c_n) = self.lstm(embeds)
+		packed_embeds = nn.utils.rnn.pack_padded_sequence(embeds, seq_lens, enforce_sorted=False, batch_first=True)
+			# embeds = packed_embeds.clone()
+		enc_packed, (h_n, c_n) = self.lstm(packed_embeds)
+		# enc, (h_n, c_n) = self.lstm(embeds)
 
 		# if seq_lens is not None:
-		# 	enc, _ = nn.utils.rnn.packed_sequence(enc, batch_first=True)
+		enc, _ = nn.utils.rnn.pad_packed_sequence(enc_packed, batch_first=True)
 		# u_it = self.relu(self.ui(enc))
 		u_it = self.tan_h(self.ui(enc))
+
+		
 		weights = torch.softmax(u_it.matmul(self.uw), dim=1).unsqueeze(1)
 		sent = torch.sum(weights.matmul(enc), dim=1)
+
+
 
 		fc1_out = self.fc1(sent)
 		logits = self.fc(fc1_out)

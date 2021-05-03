@@ -18,12 +18,12 @@ class NBOW(nn.Module):
         self.NUM_CLASSES= NUM_CLASSES
         self.vocab_size = VOCAB_SIZE
         self.embedding = nn.Embedding(VOCAB_SIZE, DIM_EMB)
-        self.conv1 = nn.Conv1d(DIM_EMB, 800, 3)
-        self.conv2 = nn.Conv1d(DIM_EMB, 800, 4)
-        self.conv3 = nn.Conv1d(DIM_EMB, 800, 5)
+        self.conv1 = nn.Conv1d(DIM_EMB, 700, 3)
+        self.conv2 = nn.Conv1d(DIM_EMB, 700, 4)
+        self.conv3 = nn.Conv1d(DIM_EMB, 700, 5)
         self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(p=0.55)
-        self.linear1 = nn.Linear(2400, NUM_CLASSES)
+        self.dropout = nn.Dropout(p=0.60)
+        self.linear1 = nn.Linear(2100, NUM_CLASSES)
         # self.linear2 = nn.Linear(10, NUM_CLASSES)
         self.log_softmax = nn.LogSoftmax(dim=1)
 
@@ -47,17 +47,6 @@ class NBOW(nn.Module):
         # lin_out_2 = self.linear2(lin_out_1)
         output = self.log_softmax(lin_out_1)
         return output
-        # embedded = self.embedded(X)
-        # embedded = embedded.unsqueeze(0)
-        # conv = self.convolution(embedded)
-        # pool = self.pool(conv)
-        # dropout = self.dropout(pool)
-        #
-        # linear = self.linear(dropout)
-        # relu = self.relu(linear)
-        # #output = self.logSoftmax(relu)
-
-        # return relu
 
 
 def EvalNet(data, net):
