@@ -170,7 +170,7 @@ def main():
 
         # X = train_data.XwordList
         # Y = train_data.Y
-        losses, accuracies = train_network(model, X_train, Y_train, 10, dev_data, lr=0.0055, batchSize=50, num_classes=n_classes, device = device)
+        losses, accuracies = train_network(model, X_train, Y_train, 10, dev_data, lr=0.0035, batchSize=100, num_classes=n_classes, device = device)
         print(accuracies)
 
     else:

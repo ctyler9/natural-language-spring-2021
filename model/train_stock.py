@@ -81,7 +81,7 @@ def pad_batch_input(X_list, device=torch.device('cpu')):
     return X_padded
 
 
-def train_network(net, X, Y, num_epochs, dev, lr=0.001, batchSize=50, use_gpu=False, num_classes=5, device=torch.device('cpu')):
+def train_network(net, X, Y, num_epochs, dev, lr=0.001, batchSize=50, use_gpu=False, num_classes=2, device=torch.device('cpu')):
 
     print("Start Training!")
     #TODO: initialize optimizer.
@@ -164,7 +164,8 @@ def nbow(device_type, save_model):
         nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes).cuda()
         X = train_data.XwordList
         Y = train_data.Y
-        losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=50, device = device)
+        dev_data = (dev_data.XwordList, dev_data.Y)
+        losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=100, lr=0.0015, num_classes=n_classes, device = device)
         print(accuracies)
         # train_model(nbow_model, X, Y, 1, dev_data, use_cuda=True)
     else:
@@ -172,7 +173,8 @@ def nbow(device_type, save_model):
         nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes)
         X = train_data.XwordList
         Y = train_data.Y
-        losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=50, device = device)
+        dev_data = (dev_data.XwordList, dev_data.Y)
+        losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=50, lr=0.0015, num_classes=n_classes, device = device)
         print(accuracies)
         # train_model(nbow_model, X, Y, 1, dev_data, use_cuda=False)
 
@@ -191,29 +193,29 @@ def attention(device_type, save_model):
     save_model = True
 
     if path == "../data/reddit_wsb.csv":
-      data = load_csv(path, "reddit")
-      vocab = create_vocab(data['title'].values)
+        data = load_csv(path, "reddit")
+        vocab = create_vocab(data['title'].values)
     if path == "../data/twitter_data.csv":
-      data = load_csv(path, "twitter")
-      vocab = create_vocab(data['Text'].values)
+        data = load_csv(path, "twitter")
+        vocab = create_vocab(data['Text'].values)
 
     split_point = int(len(data)*0.9)
     train_df = data[0:split_point]
     dev_df = data[split_point:]
 
     print("load train data")
+    n_classes = 2
     if path == "../data/reddit_wsb.csv":
-      n_classes = 2
-      train_data = WSBDataLarge(path, dataframe=train_df, vocab=vocab, train=True)
-      print("load dev data")
-      dev_data = WSBDataLarge(path, dataframe=dev_df, vocab=vocab, train=False)
-      print(train_data.vocab.get_vocab_size())
+        train_data = WSBDataLarge(path, dataframe=train_df, vocab=vocab, train=True)
+        print("load dev data")
+        dev_data = WSBDataLarge(path, dataframe=dev_df, vocab=vocab, train=False)
+        print(train_data.vocab.get_vocab_size())
     if path == "../data/twitter_data.csv":
-      n_classes = 2
-      train_data = TwitterData(path, dataframe=train_df, vocab=vocab, train=True)
-      print("load dev data")
-      dev_data = TwitterData(path, dataframe=dev_df, vocab=vocab, train=False)
-      print(train_data.vocab.get_vocab_size())
+        n_classes = 2
+        train_data = TwitterData(path, dataframe=train_df, vocab=vocab, train=True)
+        print("load dev data")
+        dev_data = TwitterData(path, dataframe=dev_df, vocab=vocab, train=False)
+        print(train_data.vocab.get_vocab_size())
 
 
     if device_type == "gpu":
@@ -222,16 +224,16 @@ def attention(device_type, save_model):
         X = train_data.XwordList
         Y = train_data.Y
         dev_data = (dev_data.XwordList, dev_data.Y)
-        losses, accuracies = train_network(attn_model, X, Y, 10, dev_data, batchSize=50, device = device, num_classes=n_classes)
+        losses, accuracies = train_network(attn_model, X, Y, 10, dev_data, batchSize=100, device = device, lr=0.0010, num_classes=n_classes)
         print(accuracies)
         # train_model(attn_model, X, Y, 1, dev_data, use_cuda=True)
     else:
         device = torch.device('cpu')
-        attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes)
+        attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350,NUM_CLASSES=n_classes)
         X = train_data.XwordList
         Y = train_data.Y
         dev_data = (dev_data.XwordList, dev_data.Y)
-        losses, accuracies = train_network(attn_model, X, Y, 10, dev_data, batchSize=50, device = device, num_classes=n_classes)
+        losses, accuracies = train_network(attn_model, X, Y, 10, dev_data, batchSize=100, device = device, lr=0.0010, num_classes=n_classes)
         print(accuracies)
         # train_model(attn_model, X, Y, 1, dev_data, use_cuda=False)
 
