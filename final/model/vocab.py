@@ -331,7 +331,7 @@ class WSBDataStock():
 					label = self.gme_volitility[str_time]
 					Y.append(label)
 				except:
-					Y.append(np.random.choice(["low", "medium", "high"]))
+					Y.append(np.random.choice([0, 1, 2]))
 
 
 		print(aset)
@@ -373,7 +373,7 @@ class WSBDataStock():
 
 		col = "Volitility"
 		conditions = [ df[col] <= std_v, (df[col] > std_v) & (df[col] < 2*std_v), df[col] >= 2 * std_v]
-		choices    = [ "low", 'medium', 'high' ]
+		choices    = [ 0, 1, 2 ]
 		df["Volitility_bins"] = np.select(conditions, choices, default=np.nan)
 
 		self.gme_volitility = pd.Series(df['Volitility_bins'].values, index=df.Date_str)
