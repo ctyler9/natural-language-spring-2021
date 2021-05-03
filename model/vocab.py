@@ -318,14 +318,11 @@ class WSBDataLarge():
 		self.stock_price(stock_df)
 
 
-		#self.dataframe["Date"] = pd.to_datetime(dataframe["Date"], format='%Y-%m-%d %H:%M:%S')
-
-
 		self.dataframe["timestamp"] = pd.to_datetime(self.dataframe["timestamp"], format='%Y-%m-%d %H:%M:%S')
 
 		isBusinessday = BDay().onOffset
 		match_series = self.dataframe["timestamp"].map(isBusinessday)
-		self.dataframe = self.dataframe[match_series]
+		self.dataframe = self.dataframe[match_series].copy()
 
 		X_values = []
 		X_row_indices = []
@@ -398,11 +395,11 @@ class WSBDataLarge():
 		dataframe["Date"] = pd.to_datetime(dataframe["Date"], format='%Y-%m-%d %H:%M:%S')
 		# start_date = min(self.dataframe['timestamp']) not working for some reason
 		start_date = "2021-01-28 00:00:00"
-		df = dataframe[["Date", "Open", "Close"]]
+		df = dataframe[["Date", "Open", "Close", "High"]]
 		df = df[df["Date"] >= start_date]
 		df["Date_str"] = df["Date"].dt.strftime('%m') + '-' + df["Date"].dt.strftime('%d')
 
-		df['Up_Down'] = np.where((df["Close"] - df["Open"]) > 0, 1, 0)
+		df['Up_Down'] = np.where((df["High"] - df["Open"]) > 0, 1, 0)
 
 		print(df.head)
 		self.gme_stock_dict = pd.Series(df['Up_Down'].values, index=df.Date_str)
@@ -420,8 +417,8 @@ if __name__ == '__main__':
 	print(train_df)
 
 	print("load train data")
-	train_data = WSBData(wsb_file_path, dataframe=train_df, vocab=vocab, train=True)
-	dev_data = WSBData(wsb_file_path, dataframe=dev_df, vocab=vocab, train=False)
+	train_data = WSBDataLarge(wsb_file_path, dataframe=train_df, vocab=vocab, train=True)
+	dev_data = WSBDataLarge(wsb_file_path, dataframe=dev_df, vocab=vocab, train=False)
 	dev_labels = dev_data.Y
 	dev_unique, dev_counts = np.unique(dev_labels, return_counts=True)
 
