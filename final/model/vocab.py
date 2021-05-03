@@ -11,7 +11,6 @@ from pandas.tseries.offsets import BDay
 from datetime import datetime, timedelta, date
 
 
-
 from scipy.sparse import csr_matrix
 import numpy as np
 from collections import Counter
@@ -78,8 +77,7 @@ def load_csv(csv_file_path, type_=None):
 
 	return data
 
-
-class WSBData():
+class WSBDataScore():
 	def __init__(self, csv_file_path, dataframe=None, vocab=None, train=True):
 		""" Reads in data into sparse matrix format """
 		if not vocab:
@@ -246,76 +244,8 @@ class WSBData():
 		self.func_percentiles = func_percentiles
 		print(self.func_percentiles)
 
-
-class TwitterData():
-	def __init__(self, csv_file_path, dataframe=None, vocab=None, train=True):
-		""" Reads in data into sparse matrix format """
-		if not vocab:
-			self.vocab = Vocab()
-		else:
-			self.vocab = vocab
-
-		if dataframe is not None:
-			self.dataframe = dataframe
-		else:
-			self.dataframe = pd.read_csv(csv_file_path)
-
-
-		rows = self.dataframe.shape[0]
-
-		X_values = []
-		X_row_indices = []
-		X_col_indices = []
-		Y = []
-
-		XwordList = []
-		XfileList = []
-
-		#Read entries
-		for i in tqdm(range(len(self.dataframe))):
-			row = self.dataframe.iloc[i, :]
-			title = row[0]
-			wordlist = []
-			tokenized_title = word_tokenize(title)
-			for w in tokenized_title:
-				id = self.vocab.get_id(w.lower())
-				if id >= 0:
-					wordlist.append(id)
-
-			if len(wordlist) == 0:
-				continue
-			XwordList.append(wordlist)
-			XfileList.append(row[0])
-			wordCounts = Counter(wordlist)
-			for (wordId, count) in wordCounts.items():
-				if wordId >= 0:
-					X_row_indices.append(len(row[0])+i)
-					X_col_indices.append(wordId)
-					X_values.append(count)
-
-			Y.append(row[1])
-
-
-		self.vocab.lock()
-
-		#Create a sparse matrix in csr format
-		# self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.get_vocab_size()))
-		self.Y = np.asarray(Y)
-		print(self.Y.shape)
-		print(len(XwordList))
-		#Randomly shuffle
-		index = np.arange(len(XwordList))
-		# print(self.X.shape)
-		# index = np.arange(self.X.shape[0])
-		np.random.shuffle(index)
-		# self.X = self.X[index,:]
-		self.XwordList = [torch.LongTensor(XwordList[i]) for i in index]  #Two different sparse formats, csr and lists of IDs (XwordList).
-		self.XfileList = [XfileList[i] for i in index]
-		self.Y = self.Y[index]
-
-
-class WSBDataLarge():
-	def __init__(self, csv_file_path, dataframe=None, vocab=None, train=True):
+class WSBDataStock():
+	def __init__(self, csv_file_path, stock_path = "../data/GME.csv", label_type="up_down", dataframe=None, vocab=None, train=True):
 		""" Reads in data into sparse matrix format """
 		if not vocab:
 			self.vocab = Vocab()
@@ -329,15 +259,21 @@ class WSBDataLarge():
 
 		rows = self.dataframe.shape[0]
 
-		stock_df = pd.read_csv("../data/GME.csv")
+		stock_df = pd.read_csv(stock_path)
 		self.stock_price(stock_df)
 
+		self.label_type = label_type
 
 		self.dataframe["timestamp"] = pd.to_datetime(self.dataframe["timestamp"], format='%Y-%m-%d %H:%M:%S')
 
-		isBusinessday = BDay().onOffset
+		sundays = self.dataframe[self.dataframe.timestamp == 6]
+
+		isBusinessday = BDay().is_on_offset
 		match_series = self.dataframe["timestamp"].map(isBusinessday)
 		self.dataframe = self.dataframe[match_series].copy()
+
+		self.dataframe = pd.concat([self.dataframe, sundays])
+		self.dataframe = self.dataframe[(self.dataframe.timestamp == 4) == False]
 
 		X_values = []
 		X_row_indices = []
@@ -348,6 +284,8 @@ class WSBDataLarge():
 		XfileList = []
 
 		#Read entries
+		aset = set()
+		label_count = 0
 		for i in tqdm(range(len(self.dataframe))):
 			row = self.dataframe.iloc[i, :]
 			title = row[0]
@@ -370,23 +308,35 @@ class WSBDataLarge():
 					X_col_indices.append(wordId)
 					X_values.append(count)
 
+			
 			### Add Y logic
-
 			reddit_date = row[-1] + timedelta(days=1)
-			#reddit_date_mon = row[-1] + timedelta(days=2)
 			str_time = reddit_date.strftime('%m') + '-' + reddit_date.strftime('%d')
-			#str_time_mon = reddit_date_mon.strftime('%m') + '-' + reddit_date_mon.strftime('%d')
 
+			label_count += 1
 
+			
 			# need to figure out the fix for Friday to Saturday
-			try:
-				label = self.gme_stock_dict[str_time]
-				Y.append(label)
-			except:
-				#Y.append(self.gme_stock_dict[str_time_mon])
-				Y.append(0)
+			if self.label_type == "up_down":
+				try:
+					label = self.gme_up_down[str_time]
+					Y.append(label)
+				except:
+					print(str_time)
+					#Y.append(self.gme_up_down[str_time_mon])
+					Y.append(0)
+
+			if self.label_type == "volitility": 
+				try:
+					label = self.gme_volitility[str_time]
+					Y.append(label)
+				except:
+					aset.add(str_time)
+					Y.append(0)
 
 
+		print(aset)
+		print(label_count)
 		self.vocab.lock()
 
 		#Create a sparse matrix in csr format
@@ -405,20 +355,29 @@ class WSBDataLarge():
 		self.XfileList = [XfileList[i] for i in index]
 		self.Y = self.Y[index]
 
-
 	def stock_price(self, dataframe):
 		dataframe["Date"] = pd.to_datetime(dataframe["Date"], format='%Y-%m-%d %H:%M:%S')
-		# start_date = min(self.dataframe['timestamp']) not working for some reason
+		#start_date = min(self.dataframe['timestamp'])
 		start_date = "2021-01-28 00:00:00"
-		df = dataframe[["Date", "Open", "Close", "High"]]
+		df = dataframe.copy()
 		df = df[df["Date"] >= start_date]
 		df["Date_str"] = df["Date"].dt.strftime('%m') + '-' + df["Date"].dt.strftime('%d')
 
+		## date up or down 
 		df['Up_Down'] = np.where((df["High"] - df["Open"]) > 0, 1, 0)
+		self.gme_up_down = pd.Series(df['Up_Down'].values, index=df.Date_str)
 
-		print(df.head)
-		self.gme_stock_dict = pd.Series(df['Up_Down'].values, index=df.Date_str)
+		## volitility 
+		df["Volitility"] = (df["High"] - df["Low"]).abs()
+		mean_v = np.mean(df["Volitility"])
+		std_v = np.std(df["Volitility"])
 
+		col = "Volitility"
+		conditions = [ df[col] <= std_v, (df[col] > std_v) & (df[col] < 2*std_v), df[col] >= 2 * std_v]
+		choices    = [ "low", 'medium', 'high' ]
+		df["Volitility_bins"] = np.select(conditions, choices, default=np.nan)
+
+		self.gme_volitility = pd.Series(df['Volitility_bins'].values, index=df.Date_str)
 
 
 if __name__ == '__main__':
@@ -432,8 +391,8 @@ if __name__ == '__main__':
 	print(train_df)
 
 	print("load train data")
-	train_data = WSBDataLarge(wsb_file_path, dataframe=train_df, vocab=vocab, train=True)
-	dev_data = WSBDataLarge(wsb_file_path, dataframe=dev_df, vocab=vocab, train=False)
+	train_data = WSBDataStock(wsb_file_path, label_type="volitility", dataframe=train_df, vocab=vocab, train=True)
+	dev_data = WSBDataStock(wsb_file_path, label_type="volitility", dataframe=dev_df, vocab=vocab, train=False)
 	dev_labels = dev_data.Y
 	dev_unique, dev_counts = np.unique(dev_labels, return_counts=True)
 
