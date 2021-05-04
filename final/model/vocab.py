@@ -459,6 +459,7 @@ class TwitterData():
 if __name__ == '__main__':
 	wsb_file_path = "../data/reddit_wsb.csv"
 	wsb_data = load_csv(wsb_file_path)
+	print(wsb_data)
 	vocab = create_vocab(wsb_data['title'].values)
 
 	split_point = int(len(wsb_data)*0.9)

@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import argparse
 from model_cnn import NBOW
-from model_attention import AttentionModel
+from model_attention import HierarchicalAttentionNetwork
 from vocab import Vocab, WSBDataStock, load_csv, create_vocab
 import matplotlib.pyplot as plt
 
@@ -43,7 +43,7 @@ def eval_network(data, net, use_gpu=False, batch_size=25, device=torch.device('c
         batch_x = pad_batch_input(X[batch:batch + batch_size], device=device)
         batch_y = torch.tensor(Y[batch:batch + batch_size], device=device)
         batch_y_hat = net.forward(batch_x)
-        # if isinstance(net, AttentionModel):
+        # if isinstance(net, HierarchicalAttentionNetwork):
         #     batch_y_hat = batch_y_hat[0]
         predictions = batch_y_hat.argmax(dim=1)
         batch_predictions.append(predictions)
@@ -100,8 +100,6 @@ def train_network(net, X, Y, num_epochs, dev, lr=0.001, batchSize=50, use_gpu=Fa
             batch_onehot_labels = convert_to_onehot(batch_labels, NUM_CLASSES=num_classes, device=device)
             optimizer.zero_grad()
             batch_y_hat = net.forward(batch_tweets)
-            # if isinstance(net, AttentionModel): # if its a tuple
-            #     batch_y_hat = batch_y_hat[0]
             batch_losses = torch.neg(batch_y_hat)*batch_onehot_labels #cross entropy loss
             loss = batch_losses.mean()
             loss.backward()
@@ -224,7 +222,7 @@ def attention(device_type, save_model, label_type):
 
     if device_type == "gpu":
         device = torch.device('cuda:0')
-        attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes).cuda()
+        attn_model = HierarchicalAttentionNetwork(vocab_size=train_data.vocab.get_vocab_size(), word_gru_hidden_dim=350, num_classes=n_classes).cuda()
         X = train_data.XwordList
         Y = train_data.Y
         dev_data = (dev_data.XwordList, dev_data.Y)
@@ -233,7 +231,7 @@ def attention(device_type, save_model, label_type):
         # train_model(attn_model, X, Y, 1, dev_data, use_cuda=True)
     else:
         device = torch.device('cpu')
-        attn_model = AttentionModel(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes)
+        attn_model = HierarchicalAttentionNetwork(vocab_size=train_data.vocab.get_vocab_size(), word_gru_hidden_dim=350, num_classes=n_classes)
         X = train_data.XwordList
         Y = train_data.Y
         dev_data = (dev_data.XwordList, dev_data.Y)
