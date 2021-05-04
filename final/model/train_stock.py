@@ -6,9 +6,9 @@ import numpy as np
 import torch.nn.functional as F
 from tqdm import tqdm
 import argparse
-from model import NBOW
+from model_cnn import NBOW
 from model_attention import AttentionModel
-from vocab import Vocab, WSBData, WSBDataLarge, load_csv, create_vocab
+from vocab import Vocab, WSBDataStock, load_csv, create_vocab
 import matplotlib.pyplot as plt
 
 def parse_args():
@@ -26,6 +26,7 @@ def parse_args():
     )
     parser.add_argument("--model_type", type=str, choices=["nbow", "attention"], default="nbow")
     parser.add_argument("--save_model", dest="save_model", action="store_true")
+    parser.add_argument("--label_type", type=str, choices=["up_down", "volitility"])
     args = parser.parse_args()
     return args
 
@@ -81,7 +82,7 @@ def pad_batch_input(X_list, device=torch.device('cpu')):
     return X_padded
 
 
-def train_network(net, X, Y, num_epochs, dev, lr=0.001, batchSize=50, use_gpu=False, num_classes=5, device=torch.device('cpu')):
+def train_network(net, X, Y, num_epochs, dev, lr=0.001, batchSize=50, use_gpu=False, num_classes=2, device=torch.device('cpu')):
 
     print("Start Training!")
     #TODO: initialize optimizer.
@@ -129,7 +130,7 @@ def plot_accuracy(accuracy_results, model_name):
     # plt.legend()
     plt.show()
 
-def nbow(device_type, save_model):
+def nbow(device_type, save_model, label_type):
     reddit_path = "../data/reddit_wsb.csv"
     twitter_path = "../data/twitter_data.csv"
     path = reddit_path
@@ -148,9 +149,9 @@ def nbow(device_type, save_model):
 
     print("load train data")
     if path == "../data/reddit_wsb.csv":
-      train_data = WSBDataLarge(path, dataframe=train_df, vocab=vocab, train=True)
+      train_data = WSBDataStock(path, dataframe=train_df, vocab=vocab, label_type=label_type, train=True)
       print("load dev data")
-      dev_data = WSBDataLarge(path, dataframe=dev_df, vocab=vocab, train=False)
+      dev_data = WSBDataStock(path, dataframe=dev_df, vocab=vocab, label_type=label_type, train=False)
       print(train_data.vocab.get_vocab_size())
     if path == "../data/twitter_data.csv":
       train_data = TwitterData(path, dataframe=train_df, vocab=vocab, train=True)
@@ -164,7 +165,8 @@ def nbow(device_type, save_model):
         nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes).cuda()
         X = train_data.XwordList
         Y = train_data.Y
-        losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=50, device = device)
+        dev_data = (dev_data.XwordList, dev_data.Y)
+        losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=100, num_classes=2, device = device)
         print(accuracies)
         # train_model(nbow_model, X, Y, 1, dev_data, use_cuda=True)
     else:
@@ -172,17 +174,18 @@ def nbow(device_type, save_model):
         nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes)
         X = train_data.XwordList
         Y = train_data.Y
-        losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=50, device = device)
+        dev_data = (dev_data.XwordList, dev_data.Y)
+        losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=100, num_classes=2, device = device)
         print(accuracies)
         # train_model(nbow_model, X, Y, 1, dev_data, use_cuda=False)
 
     if save_model:
         torch.save(nbow_model.state_dict(), "nbow.pth")
-    plot_accuracy(accuracies, "CNN LSTM WSB Stock Data")
-    np.save("results/cnn-sentiment-accuracy-wsb-stock.npy", np.array(accuracies))
+    plot_accuracy(accuracies, "CNN WSB Stock Data")
+    np.save("results/cnn-sentiment-accuracy-wsb-stock-" + label_type + ".npy", np.array(accuracies))
 
 
-def attention(device_type, save_model):
+def attention(device_type, save_model, label_type):
     reddit_path = "../data/reddit_wsb.csv"
     twitter_path = "../data/twitter_data.csv"
 
@@ -202,17 +205,20 @@ def attention(device_type, save_model):
     dev_df = data[split_point:]
 
     print("load train data")
+    n_classes=2
     if path == "../data/reddit_wsb.csv":
       n_classes = 2
-      train_data = WSBDataLarge(path, dataframe=train_df, vocab=vocab, train=True)
+      train_data = WSBDataStock(path, dataframe=train_df, label_type=label_type, vocab=vocab, train=True)
       print("load dev data")
-      dev_data = WSBDataLarge(path, dataframe=dev_df, vocab=vocab, train=False)
+      dev_data = WSBDataStock(path, dataframe=dev_df, label_type=label_type, vocab=vocab, train=False)
+      print("vocab size")
       print(train_data.vocab.get_vocab_size())
     if path == "../data/twitter_data.csv":
       n_classes = 2
       train_data = TwitterData(path, dataframe=train_df, vocab=vocab, train=True)
       print("load dev data")
       dev_data = TwitterData(path, dataframe=dev_df, vocab=vocab, train=False)
+      print("vocab size")
       print(train_data.vocab.get_vocab_size())
 
 
@@ -222,7 +228,7 @@ def attention(device_type, save_model):
         X = train_data.XwordList
         Y = train_data.Y
         dev_data = (dev_data.XwordList, dev_data.Y)
-        losses, accuracies = train_network(attn_model, X, Y, 10, dev_data, batchSize=50, device = device, num_classes=n_classes)
+        losses, accuracies = train_network(attn_model, X, Y, 10, dev_data, batchSize=100, device = device, num_classes=n_classes)
         print(accuracies)
         # train_model(attn_model, X, Y, 1, dev_data, use_cuda=True)
     else:
@@ -231,7 +237,7 @@ def attention(device_type, save_model):
         X = train_data.XwordList
         Y = train_data.Y
         dev_data = (dev_data.XwordList, dev_data.Y)
-        losses, accuracies = train_network(attn_model, X, Y, 10, dev_data, batchSize=50, device = device, num_classes=n_classes)
+        losses, accuracies = train_network(attn_model, X, Y, 10, dev_data, batchSize=100, device = device, num_classes=n_classes)
         print(accuracies)
         # train_model(attn_model, X, Y, 1, dev_data, use_cuda=False)
 
@@ -239,17 +245,18 @@ def attention(device_type, save_model):
         torch.save(attn_model.state_dict(), "attention.pth")
 
     plot_accuracy(accuracies, "Attention LSTM WSB Stock Data")
-    np.save("results/attention-sentiment-accuracy-wsb-stock.npy", np.array(accuracies))
+    np.save("results/attention-sentiment-accuracy-wsb-stock-" + label_type + ".npy", np.array(accuracies))
 
 def main():
     args = parse_args()
     model = args.model_type
     device_type = args.device
     save_model = args.save_model
+    label_type = args.label_type
     if model == "attention":
-        attention(device_type, save_model)
+        attention(device_type, save_model, label_type)
     elif model == "nbow":
-        nbow(device_type, save_model)
+        nbow(device_type, save_model, label_type)
 
 
 if __name__ == '__main__':

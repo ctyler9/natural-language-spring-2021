@@ -13,7 +13,7 @@ from vocab import *
 
 
 class NBOW(nn.Module):
-    def __init__(self, VOCAB_SIZE, DIM_EMB=300, NUM_CLASSES=5):
+    def __init__(self, VOCAB_SIZE, DIM_EMB=300, NUM_CLASSES=2):
         super(NBOW, self).__init__()
         self.NUM_CLASSES= NUM_CLASSES
         self.vocab_size = VOCAB_SIZE

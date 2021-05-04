@@ -72,8 +72,13 @@ def load_csv(csv_file_path, type_=None):
 		data = pd.read_csv(csv_file_path, delimiter=",")
 		data = data[["title", "score", "comms_num", "timestamp"]]
 
+
 	if type_ == "twitter":
 		data = pd.read_csv(csv_file_path, delimiter=",")
+		text = data["Text"].values
+		label = data["Sentiment"].values
+		label[label == -1] = 0
+		data = pd.DataFrame({"Text":text, "Sentiment":label})
 
 	return data
 
@@ -275,6 +280,12 @@ class WSBDataStock():
 		self.dataframe = pd.concat([self.dataframe, sundays])
 		self.dataframe = self.dataframe[(self.dataframe.timestamp == 4) == False]
 
+		#filter down to posts that mention gme
+		gme_stock_names = ["GME", "gme", "SEC", "stonks", "game stop", "GameStop", "Game Stop", "Gaem Stop"]
+		filtered_data = self.dataframe[self.dataframe.title.str.contains("|".join(gme_stock_names), case=False)].copy()
+		if len(filtered_data) > 1000:
+			self.dataframe = filtered_data
+
 		X_values = []
 		X_row_indices = []
 		X_col_indices = []
@@ -308,25 +319,24 @@ class WSBDataStock():
 					X_col_indices.append(wordId)
 					X_values.append(count)
 
-			
+
 			### Add Y logic
 			reddit_date = row[-1] + timedelta(days=1)
 			str_time = reddit_date.strftime('%m') + '-' + reddit_date.strftime('%d')
 
 			label_count += 1
 
-			
+
 			# need to figure out the fix for Friday to Saturday
 			if self.label_type == "up_down":
 				try:
 					label = self.gme_up_down[str_time]
 					Y.append(label)
 				except:
-					print(str_time)
 					#Y.append(self.gme_up_down[str_time_mon])
 					Y.append(np.random.choice([0, 1]))
 
-			if self.label_type == "volitility": 
+			if self.label_type == "volitility":
 				try:
 					label = self.gme_volitility[str_time]
 					Y.append(label)
@@ -343,6 +353,7 @@ class WSBDataStock():
 
 		self.Y = np.asarray(Y)
 		print(self.Y.shape)
+		print("NUM SENTENCES: ")
 		print(len(XwordList))
 		#Randomly shuffle
 		index = np.arange(len(XwordList))
@@ -362,11 +373,11 @@ class WSBDataStock():
 		df = df[df["Date"] >= start_date]
 		df["Date_str"] = df["Date"].dt.strftime('%m') + '-' + df["Date"].dt.strftime('%d')
 
-		## date up or down 
+		## date up or down
 		df['Up_Down'] = np.where((df["High"] - df["Open"]) > 0, 1, 0)
 		self.gme_up_down = pd.Series(df['Up_Down'].values, index=df.Date_str)
 
-		## volitility 
+		## volitility
 		df["Volitility"] = (df["High"] - df["Low"]).abs()
 		mean_v = np.mean(df["Volitility"])
 		std_v = np.std(df["Volitility"])
@@ -378,6 +389,72 @@ class WSBDataStock():
 
 		self.gme_volitility = pd.Series(df['Volitility_bins'].values, index=df.Date_str)
 
+class TwitterData():
+	def __init__(self, csv_file_path, dataframe=None, vocab=None, train=True):
+		""" Reads in data into sparse matrix format """
+		if not vocab:
+			self.vocab = Vocab()
+		else:
+			self.vocab = vocab
+
+		if dataframe is not None:
+			self.dataframe = dataframe
+		else:
+			self.dataframe = pd.read_csv(csv_file_path)
+
+
+		rows = self.dataframe.shape[0]
+
+		X_values = []
+		X_row_indices = []
+		X_col_indices = []
+		Y = []
+
+		XwordList = []
+		XfileList = []
+
+		#Read entries
+		for i in tqdm(range(len(self.dataframe))):
+			row = self.dataframe.iloc[i, :]
+			title = row[0]
+			wordlist = []
+			tokenized_title = word_tokenize(title)
+			for w in tokenized_title:
+				id = self.vocab.get_id(w.lower())
+				if id >= 0:
+					wordlist.append(id)
+
+			if len(wordlist) == 0:
+				continue
+			XwordList.append(wordlist)
+			XfileList.append(row[0])
+			wordCounts = Counter(wordlist)
+			for (wordId, count) in wordCounts.items():
+				if wordId >= 0:
+					X_row_indices.append(len(row[0])+i)
+					X_col_indices.append(wordId)
+					X_values.append(count)
+
+			Y.append(row[1])
+
+
+		self.vocab.lock()
+
+		#Create a sparse matrix in csr format
+		# self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.get_vocab_size()))
+		self.Y = np.asarray(Y)
+		print(self.Y.shape)
+		print(len(XwordList))
+		#Randomly shuffle
+		index = np.arange(len(XwordList))
+		# print(self.X.shape)
+		# index = np.arange(self.X.shape[0])
+		np.random.shuffle(index)
+		# self.X = self.X[index,:]
+		self.XwordList = [torch.LongTensor(XwordList[i]) for i in index]  #Two different sparse formats, csr and lists of IDs (XwordList).
+		self.XfileList = [XfileList[i] for i in index]
+		self.Y = self.Y[index]
+
 
 if __name__ == '__main__':
 	wsb_file_path = "../data/reddit_wsb.csv"
@@ -385,13 +462,13 @@ if __name__ == '__main__':
 	vocab = create_vocab(wsb_data['title'].values)
 
 	split_point = int(len(wsb_data)*0.9)
-	train_df = wsb_data[0:split_point] 
+	train_df = wsb_data[0:split_point]
 	dev_df = wsb_data[split_point:]
 	print(train_df)
 
 	print("load train data")
-	train_data = WSBDataStock(wsb_file_path, label_type="volitility", dataframe=train_df, vocab=vocab, train=True)
-	dev_data = WSBDataStock(wsb_file_path, label_type="volitility", dataframe=dev_df, vocab=vocab, train=False)
+	train_data = WSBDataStock(wsb_file_path, label_type="up_down", dataframe=train_df, vocab=vocab, train=True)
+	dev_data = WSBDataStock(wsb_file_path, label_type="up_down", dataframe=dev_df, vocab=vocab, train=False)
 	dev_labels = dev_data.Y
 	dev_unique, dev_counts = np.unique(dev_labels, return_counts=True)
 

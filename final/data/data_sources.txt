@@ -1,0 +1,10 @@
+### DATA SOURCES FROM KAGGLE
+
+# WSB Reddit DATA
+https://www.kaggle.com/gpreda/reddit-wallstreetsbets-posts
+
+# STOCK MARKET DATA HISTORICAL
+https://www.kaggle.com/jacksoncrow/stock-market-dataset
+
+# Twitter data
+https://www.kaggle.com/yash612/stockmarket-sentiment-dataset?select=stock_data.csv
