@@ -11,6 +11,30 @@ from pandas.tseries.offsets import BDay
 from datetime import datetime, timedelta, date
 
 
+
+## BERT SPECIFIC 
+import torch
+import pickle
+from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler, TensorDataset)
+from torch.nn import CrossEntropyLoss, MSELoss
+from bert_utils import *
+
+from tqdm import tqdm_notebook, trange
+import os
+from pytorch_pretrained_bert import BertTokenizer, BertModel, BertForMaskedLM, BertForSequenceClassification
+from pytorch_pretrained_bert.optimization import BertAdam, WarmupLinearSchedule
+
+from multiprocessing import Pool, cpu_count
+# import convert_examples_to_features
+
+# OPTIONAL: if you want to have more information on what's happening, activate the logger as follows
+import logging
+logging.basicConfig(level=logging.INFO)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+
 from scipy.sparse import csr_matrix
 import numpy as np
 from collections import Counter
@@ -59,13 +83,13 @@ class Vocab():
 		self.locked = True
 
 def create_vocab(wsb_data):
-    vocab = Vocab()
-    for item in wsb_data:
-        tokenized_item = word_tokenize(item)
-        for word in tokenized_item:
-            id = vocab.get_id(word.lower())
-    vocab.lock()
-    return vocab
+	vocab = Vocab()
+	for item in wsb_data:
+		tokenized_item = word_tokenize(item)
+		for word in tokenized_item:
+			id = vocab.get_id(word.lower())
+	vocab.lock()
+	return vocab
 
 def load_csv(csv_file_path, type_=None):
 	if type_ == "reddit" or type_ == None:
@@ -197,7 +221,7 @@ class WSBDataScore():
 		else:
 			return "bearish"
 
- 		# bound1, bound2, bound3, bound4, bound5 = tuple(self.func_percentiles)
+		# bound1, bound2, bound3, bound4, bound5 = tuple(self.func_percentiles)
 		# # know i could have just made it return a number, but thought
 		# # i'd keep it string match to get a general concept across
 		# if sentiment >= bound1 and sentiment < bound2:
@@ -262,6 +286,11 @@ class WSBDataStock():
 		else:
 			self.dataframe = pd.read_csv(csv_file_path)
 
+		if train:
+			self.train_test = "train"
+		else:
+			self.train_test = "test"
+
 		rows = self.dataframe.shape[0]
 
 		stock_df = pd.read_csv(stock_path)
@@ -293,6 +322,7 @@ class WSBDataStock():
 
 		XwordList = []
 		XfileList = []
+		x_frame = []
 
 		#Read entries
 		aset = set()
@@ -300,6 +330,7 @@ class WSBDataStock():
 		for i in tqdm(range(len(self.dataframe))):
 			row = self.dataframe.iloc[i, :]
 			title = row[0]
+			x_frame.append(title)
 			wordlist = []
 			tokenized_title = word_tokenize(title)
 			for w in tokenized_title:
@@ -348,6 +379,31 @@ class WSBDataStock():
 		print(label_count)
 		self.vocab.lock()
 
+		bert = False 
+		if bert: 
+			bert_load = pd.DataFrame({0: Y, 1: x_frame})
+			#bert_load.to_csv("bert_" + self.label_type + ".csv")
+			split_point = int(len(bert_load)*0.9)
+			train_df = bert_load[0:split_point]
+			dev_df = bert_load[split_point:]
+
+			train_df_bert = pd.DataFrame({
+				'id':range(len(train_df)),
+				'label':train_df[0],
+				'alpha':['a']*train_df.shape[0],
+				'text': train_df[1].replace(r'\n', ' ', regex=True)
+				})
+
+			dev_df_bert = pd.DataFrame({
+				'id':range(len(dev_df)),
+				'label':dev_df[0],
+				'alpha':['a']*dev_df.shape[0],
+				'text': dev_df[1].replace(r'\n', ' ', regex=True)
+				})
+
+			train_df_bert.to_csv('../data/train_' + self.label_type + '.tsv', sep='\t', index=False, header=False)
+			dev_df_bert.to_csv('../data/dev_' + self.label_type + '.tsv', sep='\t', index=False, header=False)
+
 		#Create a sparse matrix in csr format
 		# self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.get_vocab_size()))
 
@@ -364,6 +420,8 @@ class WSBDataStock():
 		self.XwordList = [torch.LongTensor(XwordList[i]) for i in index]  #Two different sparse formats, csr and lists of IDs (XwordList).
 		self.XfileList = [XfileList[i] for i in index]
 		self.Y = self.Y[index]
+
+
 
 	def stock_price(self, dataframe):
 		dataframe["Date"] = pd.to_datetime(dataframe["Date"], format='%Y-%m-%d %H:%M:%S')
@@ -456,7 +514,77 @@ class TwitterData():
 		self.Y = self.Y[index]
 
 
-if __name__ == '__main__':
+class BertData():
+	def __init__(self, tsv_file_path, dataframe=None, train=True):
+		DATA_DIR = tsv_file_path
+		BERT_MODEL = 'bert-base-cased'
+		TASK_NAME = 'gme'
+		OUTPUT_DIR = f'outputs/{TASK_NAME}/'
+		REPORTS_DIR = f'reports/{TASK_NAME}_evaluation_report/'
+		CACHE_DIR = 'cache/'
+
+		MAX_SEQ_LENGTH = 128
+
+		TRAIN_BATCH_SIZE = 24
+		EVAL_BATCH_SIZE = 32
+		LEARNING_RATE = 2e-5
+		NUM_TRAIN_EPOCHS = 1
+		RANDOM_SEED = 42
+		GRADIENT_ACCUMULATION_STEPS = 1
+		WARMUP_PROPORTION = 0.1
+		OUTPUT_MODE = 'classification'
+
+		CONFIG_NAME = "config.json"
+		WEIGHTS_NAME = "pytorch_model.bin"
+
+		output_mode = OUTPUT_MODE
+
+		cache_dir = CACHE_DIR
+
+		if os.path.exists(REPORTS_DIR) and os.listdir(REPORTS_DIR):
+			REPORTS_DIR += f'/report_{len(os.listdir(REPORTS_DIR))}'
+			os.makedirs(REPORTS_DIR)
+		if not os.path.exists(REPORTS_DIR):
+			os.makedirs(REPORTS_DIR)
+			REPORTS_DIR += f'/report_{len(os.listdir(REPORTS_DIR))}'
+			os.makedirs(REPORTS_DIR)
+
+
+		if os.path.exists(OUTPUT_DIR) and os.listdir(OUTPUT_DIR):
+			raise ValueError("Output directory ({}) already exists and is not empty.".format(OUTPUT_DIR))
+		if not os.path.exists(OUTPUT_DIR):
+			os.makedirs(OUTPUT_DIR)
+
+
+		processor = BinaryClassificationProcessor()
+		train_examples = processor.get_train_examples(DATA_DIR)
+		train_examples_len = len(train_examples)
+
+		label_list = processor.get_labels() # [0, 1] for binary classification
+		num_labels = len(label_list)
+
+		num_train_optimization_steps = int(train_examples_len / TRAIN_BATCH_SIZE / GRADIENT_ACCUMULATION_STEPS) * NUM_TRAIN_EPOCHS
+
+		tokenizer = BertTokenizer.from_pretrained('bert-base-cased', do_lower_case=False)
+
+		label_map = {label: i for i, label in enumerate(label_list)}
+		train_examples_for_processing = [(example, label_map, MAX_SEQ_LENGTH, tokenizer, OUTPUT_MODE) for example in train_examples]
+
+
+		process_count = cpu_count() - 1
+
+		print(f'Preparing to convert {train_examples_len} examples..')
+		print(f'Spawning {process_count} processes..')
+		with Pool(process_count) as p:
+			train_features = list(tqdm(p.imap(convert_example_to_feature, train_examples_for_processing), total=train_examples_len))
+
+		with open(DATA_DIR + "train_features.pkl", "wb") as f:
+			pickle.dump(train_features, f)
+
+	
+
+
+def main2():
 	wsb_file_path = "../data/reddit_wsb.csv"
 	wsb_data = load_csv(wsb_file_path)
 	print(wsb_data)
@@ -467,9 +595,13 @@ if __name__ == '__main__':
 	dev_df = wsb_data[split_point:]
 	print(train_df)
 
+	WSBDataStock(wsb_file_path, label_type="volitility", dataframe=wsb_data, vocab=vocab, train=True)
+
+
+
 	print("load train data")
-	train_data = WSBDataStock(wsb_file_path, label_type="up_down", dataframe=train_df, vocab=vocab, train=True)
-	dev_data = WSBDataStock(wsb_file_path, label_type="up_down", dataframe=dev_df, vocab=vocab, train=False)
+	train_data = WSBDataStock(wsb_file_path, label_type="volitility", dataframe=train_df, vocab=vocab, train=True)
+	dev_data = WSBDataStock(wsb_file_path, label_type="volitility", dataframe=dev_df, vocab=vocab, train=False)
 	dev_labels = dev_data.Y
 	dev_unique, dev_counts = np.unique(dev_labels, return_counts=True)
 
@@ -492,4 +624,9 @@ if __name__ == '__main__':
 	plt.xlabel("Classes")
 	plt.ylabel("Frequency")
 	plt.show()
-	# test = WSBDataLarge("../data/reddit_data.csv")
+
+
+
+
+if __name__ == '__main__':
+	BertData("../data/")
