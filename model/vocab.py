@@ -135,23 +135,16 @@ class WSBData():
 
 			sentiment_value = self.sentiment_function(row)
 
-			if sentiment_value == "bearish":
+			if sentiment_value == "very-bearish":
 				Y.append(0)
-			elif sentiment_value == "neutral":
+			elif sentiment_value == "bearish":
 				Y.append(1)
-			else:
+			elif sentiment_value == "neutral":
 				Y.append(2)
-
-			# if sentiment_value == "very-bearish":
-			# 	Y.append(0)
-			# elif sentiment_value == "bearish":
-			# 	Y.append(1)
-			# elif sentiment_value == "neutral":
-			# 	Y.append(2)
-			# elif sentiment_value == "bullish":
-			# 	Y.append(3)
-			# elif sentiment_value == "very-bullish":
-			# 	Y.append(4)
+			elif sentiment_value == "bullish":
+				Y.append(3)
+			elif sentiment_value == "very-bullish":
+				Y.append(4)
 
 
 		self.vocab.lock()
@@ -185,28 +178,20 @@ class WSBData():
 		theta2 = 0.50
 
 		sentiment = theta1*score + theta2*comments
-		bound1, bound2, bound3 = tuple(self.func_percentiles)
-
+		# import pdb; pdb.set_trace()
+		bound1, bound2, bound3, bound4, bound5 = tuple(self.func_percentiles)
+		# know i could have just made it return a number, but thought
+		# i'd keep it string match to get a general concept across
 		if sentiment >= bound1 and sentiment < bound2:
-			return "neutral"
+			return 'bearish'
 		elif sentiment >= bound2 and sentiment < bound3:
-			return "bullish"
+			return 'neutral'
+		elif sentiment >= bound3 and sentiment < bound4:
+			return 'bullish'
+		elif sentiment >= bound4 and sentiment < bound5:
+			return 'very-bullish'
 		else:
-			return "bearish"
-
- 		# bound1, bound2, bound3, bound4, bound5 = tuple(self.func_percentiles)
-		# # know i could have just made it return a number, but thought
-		# # i'd keep it string match to get a general concept across
-		# if sentiment >= bound1 and sentiment < bound2:
-		# 	return 'bearish'
-		# elif sentiment >= bound2 and sentiment < bound3:
-		# 	return 'neutral'
-		# elif sentiment >= bound3 and sentiment < bound4:
-		# 	return 'bullish'
-		# elif sentiment >= bound4 and sentiment < bound5:
-		# 	return 'very-bullish'
-		# else:
-		# 	return "very-bearish"
+			return "very-bearish"
 
 	def get_stats_wsb(self, plot=False):
 		score = self.dataframe.iloc[:, 1].to_numpy()
@@ -233,7 +218,7 @@ class WSBData():
 		score_percentiles = []
 		comment_percentiles = []
 		func_percentiles = []
-		for perc in range(0, 100, 35):
+		for perc in range(0, 100, 20):
 			s_perc = np.percentile(score, perc)
 			c_perc = np.percentile(comments, perc)
 			f_perc = np.percentile(func, perc)
