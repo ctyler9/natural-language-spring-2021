@@ -306,7 +306,7 @@ class WSBDataStock():
 		# self.dataframe = self.dataframe[(self.dataframe.timestamp.dt.weekday == 4) == False]
 
 		#filter down to posts that mention gme, amc or short selling
-		gme_stock_names = ["GME", "AMC", "gme", "short sell", "SEC", "stonks", "game stop", "GameStop", "Game Stop", "Gaem Stop"]
+		gme_stock_names = ["GME", "$GME", "AMC", "gme", "short sell", "SEC", "stonks", "game stop", "GameStop", "Game Stop", "Gaem Stop"]
 		filtered_data = self.dataframe[self.dataframe.title.str.contains("|".join(gme_stock_names), case=False)].copy()
 		if len(filtered_data) > 1000:
 			self.dataframe = filtered_data
@@ -423,7 +423,7 @@ class WSBDataStock():
 		df["Date_str"] = df["Date"].dt.strftime('%m') + '-' + df["Date"].dt.strftime('%d')
 
 		## date up or down
-		df['Up_Down'] = np.where((df["High"] - df["Open"]) > 0, 1, 0)
+		df['Up_Down'] = np.where((df["Close"] - df["Open"]) > 0, 1, 0)
 		self.gme_up_down = pd.Series(df['Up_Down'].values, index=df.Date_str)
 
 		## volitility

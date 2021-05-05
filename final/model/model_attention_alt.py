@@ -4,10 +4,61 @@ import torch.nn.functional as F
 from vocab import *
 
 
-class AttentionModel(nn.Module): 
+
+class WordAttention(nn.Module):
+	def __init__(self, vocab_size, hidden_size=150, atten_size=200, embed_size=300, num_classes=2, dropout=0.5, pad_idx=0):
+		super(WordAttention, self).__init__()
+
+		self.pad_idx = pad_idx
+		self.word_attention = nn.Linear(2*hidden_size, atten_size)
+		self.context_weight = nn.Linear(atten_size, 1, bias=False)
+		# self.word_weight = nn.Parameter(torch.Tensor(2 * hidden_size, 2 * hidden_size))
+		# self.word_bias = nn.Parameter(torch.Tensor(1, 2 * hidden_size))
+		# self.context_weight = nn.Parameter(torch.Tensor(2 * hidden_size, 1))
+		self.dropout = nn.Dropout(p=dropout)
+		self.layer_norm = nn.LayerNorm(2 * hidden_size, elementwise_affine=True)
+		self.embedding = nn.Embedding(vocab_size, embed_size)
+		self.gru = nn.GRU(embed_size, hidden_size, num_layers=2, bidirectional=True, batch_first=True, dropout=dropout)
+		# self._create_weights(mean=0.0, std=0.05)
+		self.fc = nn.Linear(2 * hidden_size, num_classes)
+		# self.softmax = nn.Softmax()
+		self.log_softmax = nn.LogSoftmax(dim=1)
+		self.tan_h = nn.Tanh()
+
+	# def _create_weights(self, mean=0.0, std=0.05):
+	#
+	# 	self.word_weight.data.normal_(mean, std)
+	# 	self.context_weight.data.normal_(mean, std)
+
+	def forward(self, input):
+		source_lengths = torch.sum(input != self.pad_idx, axis=1).cpu()
+		seq_lens = source_lengths
+		embeds = self.embedding(input)
+		embeds = self.dropout(embeds)
+		packed_embeds = nn.utils.rnn.pack_padded_sequence(embeds, seq_lens, enforce_sorted=False, batch_first=True)
+		f_output, h_output = self.gru(packed_embeds)  # feature output and hidden state output
+		f_output, _ = nn.utils.rnn.pad_packed_sequence(f_output, batch_first=True)
+		normed_out = self.layer_norm(f_output)
+		atten_out = self.tan_h(self.word_attention(f_output))
+
+		context_vec = self.context_weight(atten_out)
+		atten_out = F.softmax(context_vec, dim=1)
+		weighted_out = f_output*atten_out
+		weighted_out = weighted_out.sum(dim=1)
+		lin_out = self.fc(weighted_out)
+		log_probs = self.log_softmax(lin_out)
+		# output = matrix_mul(f_output, self.word_weight, self.word_bias)
+		# output = matrix_mul(output, self.context_weight).permute(1,0)
+		# output = F.softmax(output)
+		# output = element_wise_mul(f_output,output.permute(1,0))
+
+		return log_probs
+
+
+class HierarchicalAttentionNetwork(nn.Module):
 	def __init__(self, vocab_size, word_hidden_size=300, sent_hidden_size=350, batch_size=50, num_classes=3):
-		
-		super(AttentionModel, self).__init__()
+
+		super(HierarchicalAttentionNetwork, self).__init__()
 		self.batch_size = batch_size
 		self.word_hidden_size = word_hidden_size
 		self.sent_hidden_size = sent_hidden_size
@@ -32,7 +83,9 @@ class AttentionModel(nn.Module):
 		output_list = []
 		input = input.unsqueeze(-1)
 		input = input.permute(1, 0, 2)
+		print(input.shape)
 		for i in input:
+			print(i.shape)
 			output, self.word_hidden_state = self.word_att_net(i.permute(1, 0), self.word_hidden_state)
 			output_list.append(output)
 		output = torch.cat(output_list, 0)
@@ -58,6 +111,7 @@ class WordAttNet(nn.Module):
 		self.lookup = nn.Embedding(vocab_size, embed_size)
 		self.gru = nn.GRU(embed_size, hidden_size, bidirectional=True)
 		self._create_weights(mean=0.0, std=0.05)
+		# self.fc = nn.Linear(2 * hidden_size, num_classes)
 
 	def _create_weights(self, mean=0.0, std=0.05):
 
@@ -95,7 +149,6 @@ class SentAttNet(nn.Module):
 		self.context_weight.data.normal_(mean, std)
 
 	def forward(self, input, hidden_state):
-
 		f_output, h_output = self.gru(input, hidden_state)
 		output = matrix_mul(f_output, self.sent_weight, self.sent_bias)
 		output = matrix_mul(output, self.context_weight).permute(1, 0)
