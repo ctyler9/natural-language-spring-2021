@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, date
 
 
 
-## BERT SPECIFIC 
+## BERT SPECIFIC
 import torch
 import pickle
 from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler, TensorDataset)
@@ -95,7 +95,7 @@ def load_csv(csv_file_path, type_=None):
 	if type_ == "reddit" or type_ == None:
 		data = pd.read_csv(csv_file_path, delimiter=",")
 		data = data[["title", "score", "comms_num", "timestamp"]]
-
+		data = data.sample(frac=1).reset_index(drop=True)
 
 	if type_ == "twitter":
 		data = pd.read_csv(csv_file_path, delimiter=",")
@@ -123,12 +123,7 @@ class WSBDataScore():
 		self.lowest_bound = -999999
 		self.get_stats_wsb()
 
-		# if train:
-		# 	dataframe = dataframe.iloc[rows//4:, :]
-		# else:
-		# 	dataframe = dataframe.iloc[:rows//4, :]
 
-		#For csr_matrix (see http://docs.scipy.org/doc/scipy-0.15.1/reference/generated/scipy.sparse.csr_matrix.html#scipy.sparse.csr_matrix)
 		X_values = []
 		X_row_indices = []
 		X_col_indices = []
@@ -298,22 +293,26 @@ class WSBDataStock():
 
 		self.label_type = label_type
 
-		self.dataframe["timestamp"] = pd.to_datetime(self.dataframe["timestamp"], format='%Y-%m-%d %H:%M:%S')
+		self.dataframe["timestamp"] = pd.to_datetime(self.dataframe["timestamp"].values, format='%Y-%m-%d %H:%M:%S')
 
-		sundays = self.dataframe[self.dataframe.timestamp == 6]
-
+		sundays = self.dataframe[self.dataframe.timestamp.dt.weekday == 6]
+		print("num sundays")
+		print(len(sundays))
 		isBusinessday = BDay().is_on_offset
 		match_series = self.dataframe["timestamp"].map(isBusinessday)
 		self.dataframe = self.dataframe[match_series].copy()
 
 		self.dataframe = pd.concat([self.dataframe, sundays])
-		self.dataframe = self.dataframe[(self.dataframe.timestamp == 4) == False]
+		# self.dataframe = self.dataframe[(self.dataframe.timestamp.dt.weekday == 4) == False]
 
-		#filter down to posts that mention gme
-		gme_stock_names = ["GME", "gme", "SEC", "stonks", "game stop", "GameStop", "Game Stop", "Gaem Stop"]
+		#filter down to posts that mention gme, amc or short selling
+		gme_stock_names = ["GME", "AMC", "gme", "short sell", "SEC", "stonks", "game stop", "GameStop", "Game Stop", "Gaem Stop"]
 		filtered_data = self.dataframe[self.dataframe.title.str.contains("|".join(gme_stock_names), case=False)].copy()
 		if len(filtered_data) > 1000:
 			self.dataframe = filtered_data
+
+		print("data after filtering")
+		print(len(self.dataframe))
 
 		X_values = []
 		X_row_indices = []
@@ -353,6 +352,7 @@ class WSBDataStock():
 
 			### Add Y logic
 			reddit_date = row[-1] + timedelta(days=1)
+			# reddit_date = row[-1]
 			str_time = reddit_date.strftime('%m') + '-' + reddit_date.strftime('%d')
 
 			label_count += 1
@@ -364,7 +364,6 @@ class WSBDataStock():
 					label = self.gme_up_down[str_time]
 					Y.append(label)
 				except:
-					#Y.append(self.gme_up_down[str_time_mon])
 					Y.append(np.random.choice([0, 1]))
 
 			if self.label_type == "volitility":
@@ -375,12 +374,10 @@ class WSBDataStock():
 					Y.append(np.random.choice([0, 1, 2]))
 
 
-		print(aset)
-		print(label_count)
 		self.vocab.lock()
 
-		bert = False 
-		if bert: 
+		bert = False
+		if bert:
 			bert_load = pd.DataFrame({0: Y, 1: x_frame})
 			#bert_load.to_csv("bert_" + self.label_type + ".csv")
 			split_point = int(len(bert_load)*0.9)
@@ -408,15 +405,9 @@ class WSBDataStock():
 		# self.X = csr_matrix((X_values, (X_row_indices, X_col_indices)), shape=(max(X_row_indices)+1, self.vocab.get_vocab_size()))
 
 		self.Y = np.asarray(Y)
-		print(self.Y.shape)
-		print("NUM SENTENCES: ")
-		print(len(XwordList))
 		#Randomly shuffle
 		index = np.arange(len(XwordList))
-		# print(self.X.shape)
-		# index = np.arange(self.X.shape[0])
 		np.random.shuffle(index)
-		# self.X = self.X[index,:]
 		self.XwordList = [torch.LongTensor(XwordList[i]) for i in index]  #Two different sparse formats, csr and lists of IDs (XwordList).
 		self.XfileList = [XfileList[i] for i in index]
 		self.Y = self.Y[index]
@@ -581,7 +572,7 @@ class BertData():
 		with open(DATA_DIR + "train_features.pkl", "wb") as f:
 			pickle.dump(train_features, f)
 
-	
+
 
 
 def main2():
@@ -595,13 +586,13 @@ def main2():
 	dev_df = wsb_data[split_point:]
 	print(train_df)
 
-	WSBDataStock(wsb_file_path, label_type="volitility", dataframe=wsb_data, vocab=vocab, train=True)
+	# WSBDataStock(wsb_file_path, label_type="volitility", dataframe=wsb_data, vocab=vocab, train=True)
 
 
 
 	print("load train data")
-	train_data = WSBDataStock(wsb_file_path, label_type="volitility", dataframe=train_df, vocab=vocab, train=True)
-	dev_data = WSBDataStock(wsb_file_path, label_type="volitility", dataframe=dev_df, vocab=vocab, train=False)
+	train_data = WSBDataStock(wsb_file_path, label_type="up_down", dataframe=train_df, vocab=vocab, train=True)
+	dev_data = WSBDataStock(wsb_file_path, label_type="up_down", dataframe=dev_df, vocab=vocab, train=False)
 	dev_labels = dev_data.Y
 	dev_unique, dev_counts = np.unique(dev_labels, return_counts=True)
 
@@ -629,4 +620,5 @@ def main2():
 
 
 if __name__ == '__main__':
-	BertData("../data/")
+	main2()
+	# BertData("../data/")

@@ -10,6 +10,7 @@ from model_cnn import NBOW
 from model_attention import HierarchicalAttentionNetwork
 from vocab import Vocab, WSBDataStock, load_csv, create_vocab
 import matplotlib.pyplot as plt
+from sklearn.metrics import f1_score, matthews_corrcoef
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -30,6 +31,8 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+pad_idx = 0
+
 def eval_network(data, net, use_gpu=False, batch_size=25, device=torch.device('cpu')):
     print("Evaluation Set")
     num_correct = 0
@@ -45,19 +48,32 @@ def eval_network(data, net, use_gpu=False, batch_size=25, device=torch.device('c
         batch_y_hat = net.forward(batch_x)
         # if isinstance(net, HierarchicalAttentionNetwork):
         #     batch_y_hat = batch_y_hat[0]
+        if isinstance(net, HierarchicalAttentionNetwork):
+            doc_lengths = torch.ones(batchSize).type(torch.LongTensor).to(device)
+            sentence_lengths = torch.sum(batch_x != pad_idx, axis=1).type(torch.LongTensor).to(device)
+            sentence_lengths = sentence_lengths.reshape((sentence_lengths.shape[0], 1))
+            batch_x = batch_x.reshape((batch_x.shape[0], 1, batch_x.shape[1]))
+            batch_y_hat = net.forward(batch_x, doc_lengths, sentence_lengths)
+        else:
+            batch_y_hat = net.forward(batch_x)
         predictions = batch_y_hat.argmax(dim=1)
         batch_predictions.append(predictions)
-        # num_correct = float((predictions == batch_y).sum())
-        # accuracy = num_correct/float(batch_size)
-        # batch_accuracies.append(accuracy)
+
     predictions = torch.cat(batch_predictions)
     predictions = predictions.type(torch.float64)
     Y_tensor = torch.tensor(Y, device=device)
     num_correct = float((predictions == Y_tensor).sum())
     accuracy = num_correct/len(Y)
 
+    predictions = predictions.cpu().numpy()
+    f1 = f1_score(Y, predictions)
+    m_coef = matthews_corrcoef(Y, predictions)
+
+
     print("Eval Accuracy: %s" % accuracy)
-    return accuracy
+    print("Eval F1 Score: %s" % f1)
+    print("Eval Matthew Correlation %s" % m_coef)
+    return accuracy, f1, m_coef
     # return min_accuracy, accuracy, max_accuracy
 
 
@@ -89,17 +105,26 @@ def train_network(net, X, Y, num_epochs, dev, lr=0.001, batchSize=50, use_gpu=Fa
     optimizer = optim.Adam(net.parameters(), lr=lr)
     epoch_losses = []
     eval_accuracy = []
+    f1_scores = []
+    m_coefs_scores = []
     for epoch in range(num_epochs):
         num_correct = 0
         total_loss = 0.0
         net.train()   #Put the network into training model
         for batch in tqdm(range(0, len(X), batchSize), leave=False):
-            batch_tweets = X[batch:batch + batchSize]
+            batch_x = X[batch:batch + batchSize]
             batch_labels = Y[batch:batch + batchSize]
-            batch_tweets = pad_batch_input(batch_tweets, device=device)
+            batch_x = pad_batch_input(batch_x, device=device)
             batch_onehot_labels = convert_to_onehot(batch_labels, NUM_CLASSES=num_classes, device=device)
             optimizer.zero_grad()
-            batch_y_hat = net.forward(batch_tweets)
+            if isinstance(net, HierarchicalAttentionNetwork):
+                doc_lengths = torch.ones(batchSize).type(torch.LongTensor).to(device)
+                sentence_lengths = torch.sum(batch_x != pad_idx, axis=1).type(torch.LongTensor).to(device)
+                sentence_lengths = sentence_lengths.reshape((sentence_lengths.shape[0], 1))
+                batch_x = batch_x.reshape((batch_x.shape[0], 1, batch_x.shape[1]))
+                batch_y_hat = net.forward(batch_x, doc_lengths, sentence_lengths)
+            else:
+                batch_y_hat = net.forward(batch_x)
             batch_losses = torch.neg(batch_y_hat)*batch_onehot_labels #cross entropy loss
             loss = batch_losses.mean()
             loss.backward()
@@ -109,24 +134,32 @@ def train_network(net, X, Y, num_epochs, dev, lr=0.001, batchSize=50, use_gpu=Fa
         epoch_losses.append(total_loss)
         net.eval()    #Switch to eval mode
         print(f"loss on epoch {epoch} = {total_loss}")
-        accuracy = eval_network(dev, net, use_gpu=use_gpu, batch_size=batchSize, device=device)
+        accuracy, f1, m_coef = eval_network(dev, net, use_gpu=use_gpu, batch_size=batchSize, device=device)
         eval_accuracy.append(accuracy)
-
+        f1_scores.append(f1)
+        m_coefs_scores.append(m_coef)
 
     print("Finished Training")
-    return epoch_losses, eval_accuracy
+    return epoch_losses, eval_accuracy, f1_scores, m_coefs_scores
 
 def plot_accuracy(accuracy_results, model_name):
-    # min_accs, accs, max_accs = accuracy_results
     plt.figure()
     plt.plot(accuracy_results, 'ro-')
-    # plt.plot(min_accs, 'bo-', label="min_accuracy")
-    # plt.plot(max_accs, 'go-', label="max_accuracy")
-    plt.title("Reddit WSB+Stock Sentiment Accuracy: " + model_name)
+    plt.title(model_name)
     plt.xlabel("Epochs")
     plt.ylabel("Validation Accuracy")
-    # plt.legend()
     plt.show()
+
+
+def plot_scores(scores, model_name, label_name):
+    plt.figure()
+    plt.plot(scores, 'ro-')
+    plt.title(model_name)
+    plt.xlabel("Epochs")
+    plt.ylabel(label_name)
+    plt.show()
+
+
 
 def nbow(device_type, save_model, label_type):
     reddit_path = "../data/reddit_wsb.csv"
@@ -146,26 +179,32 @@ def nbow(device_type, save_model, label_type):
     dev_df = data[split_point:]
 
     print("load train data")
+    n_classes = 2
     if path == "../data/reddit_wsb.csv":
-      train_data = WSBDataStock(path, dataframe=train_df, vocab=vocab, label_type=label_type, train=True)
-      print("load dev data")
-      dev_data = WSBDataStock(path, dataframe=dev_df, vocab=vocab, label_type=label_type, train=False)
-      print(train_data.vocab.get_vocab_size())
+        train_data = WSBDataStock(path, dataframe=train_df, vocab=vocab, label_type=label_type, train=True)
+        print("load dev data")
+        dev_data = WSBDataStock(path, dataframe=dev_df, vocab=vocab, label_type=label_type, train=False)
+        if label_type == "up_down":
+            n_classes = 2
+        else:
+            n_classes = 3
+        print(train_data.vocab.get_vocab_size())
     if path == "../data/twitter_data.csv":
       train_data = TwitterData(path, dataframe=train_df, vocab=vocab, train=True)
       print("load dev data")
       dev_data = TwitterData(path, dataframe=dev_df, vocab=vocab, train=False)
       print(train_data.vocab.get_vocab_size())
 
-    n_classes = 2
     if device_type == "gpu":
         device = torch.device('cuda:0')
         nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes).cuda()
         X = train_data.XwordList
         Y = train_data.Y
         dev_data = (dev_data.XwordList, dev_data.Y)
-        losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=100, num_classes=2, device = device)
+        losses, accuracies, f1_scores, m_coef_scores = train_network(nbow_model, X, Y, 10, dev_data, batchSize=100, num_classes=n_classes, device = device)
         print(accuracies)
+        print(f1_scores)
+        print(m_coef_scores)
         # train_model(nbow_model, X, Y, 1, dev_data, use_cuda=True)
     else:
         device = torch.device('cpu')
@@ -173,14 +212,20 @@ def nbow(device_type, save_model, label_type):
         X = train_data.XwordList
         Y = train_data.Y
         dev_data = (dev_data.XwordList, dev_data.Y)
-        losses, accuracies = train_network(nbow_model, X, Y, 10, dev_data, batchSize=100, num_classes=2, device = device)
+        losses, accuracies, f1_scores, m_coef_scores = train_network(nbow_model, X, Y, 10, dev_data, batchSize=100, num_classes=n_classes, device = device)
         print(accuracies)
+        print(f1_scores)
+        print(m_coef_scores)
         # train_model(nbow_model, X, Y, 1, dev_data, use_cuda=False)
 
     if save_model:
         torch.save(nbow_model.state_dict(), "nbow.pth")
-    plot_accuracy(accuracies, "CNN WSB Stock Data")
+    plot_accuracy(accuracies, "CNN WSB Stock Data Accuracy, Stock " + label_type)
+    plot_scores(f1_scores, "CNN WSB Stock Data F1 Scores, Stock " + label_type, "F1 Scores")
+    plot_scores(m_coef_scores, "CNN WSB Stock Data M Coef, Stock " + label_type, "Matthew Coef.")
     np.save("results/cnn-sentiment-accuracy-wsb-stock-" + label_type + ".npy", np.array(accuracies))
+    np.save("results/cnn-sentiment-f1-wsb-stock-" + label_type + ".npy", np.array(f1_scores))
+    np.save("results/cnn-sentiment-m_coef-wsb-stock-" + label_type + ".npy", np.array(m_coef_scores))
 
 
 def attention(device_type, save_model, label_type):
@@ -203,21 +248,24 @@ def attention(device_type, save_model, label_type):
     dev_df = data[split_point:]
 
     print("load train data")
-    n_classes=2
+    n_classes = 2
     if path == "../data/reddit_wsb.csv":
-      n_classes = 2
-      train_data = WSBDataStock(path, dataframe=train_df, label_type=label_type, vocab=vocab, train=True)
-      print("load dev data")
-      dev_data = WSBDataStock(path, dataframe=dev_df, label_type=label_type, vocab=vocab, train=False)
-      print("vocab size")
-      print(train_data.vocab.get_vocab_size())
+        train_data = WSBDataStock(path, dataframe=train_df, label_type=label_type, vocab=vocab, train=True)
+        print("load dev data")
+        dev_data = WSBDataStock(path, dataframe=dev_df, label_type=label_type, vocab=vocab, train=False)
+        print("vocab size")
+        print(train_data.vocab.get_vocab_size())
+        if label_type == "up_down":
+            n_classes = 2
+        else:
+            n_classes = 3
     if path == "../data/twitter_data.csv":
-      n_classes = 2
-      train_data = TwitterData(path, dataframe=train_df, vocab=vocab, train=True)
-      print("load dev data")
-      dev_data = TwitterData(path, dataframe=dev_df, vocab=vocab, train=False)
-      print("vocab size")
-      print(train_data.vocab.get_vocab_size())
+        n_classes = 2
+        train_data = TwitterData(path, dataframe=train_df, vocab=vocab, train=True)
+        print("load dev data")
+        dev_data = TwitterData(path, dataframe=dev_df, vocab=vocab, train=False)
+        print("vocab size")
+        print(train_data.vocab.get_vocab_size())
 
 
     if device_type == "gpu":
@@ -226,8 +274,10 @@ def attention(device_type, save_model, label_type):
         X = train_data.XwordList
         Y = train_data.Y
         dev_data = (dev_data.XwordList, dev_data.Y)
-        losses, accuracies = train_network(attn_model, X, Y, 10, dev_data, batchSize=100, device = device, num_classes=n_classes)
+        losses, accuracies, f1_scores, m_coef_scores = train_network(attn_model, X, Y, 10, dev_data, batchSize=100, device = device, num_classes=n_classes)
         print(accuracies)
+        print(f1_scores)
+        print(m_coef_scores)
         # train_model(attn_model, X, Y, 1, dev_data, use_cuda=True)
     else:
         device = torch.device('cpu')
@@ -235,15 +285,21 @@ def attention(device_type, save_model, label_type):
         X = train_data.XwordList
         Y = train_data.Y
         dev_data = (dev_data.XwordList, dev_data.Y)
-        losses, accuracies = train_network(attn_model, X, Y, 10, dev_data, batchSize=100, device = device, num_classes=n_classes)
+        losses, accuracies, f1_scores, m_coef_scores = train_network(attn_model, X, Y, 10, dev_data, batchSize=100, device = device, num_classes=n_classes)
         print(accuracies)
+        print(f1_scores)
+        print(m_coef_scores)
         # train_model(attn_model, X, Y, 1, dev_data, use_cuda=False)
 
     if save_model:
-        torch.save(attn_model.state_dict(), "attention.pth")
+        torch.save(attn_model.state_dict(), "hierarchattention.pth")
 
-    plot_accuracy(accuracies, "Attention LSTM WSB Stock Data")
+    plot_accuracy(accuracies, "Hierarchical Attention WSB Stock Data Accuracy, Stock " + label_type)
+    plot_scores(f1_scores, "Hierarchical Attention WSB Stock Data F1 Score, Stock " + label_type, "F1 Score")
+    plot_scores(m_coef_scores, "Hierarchical Attention WSB Stock Data M Coef, Stock " + label_type, "Matthew Coef")
     np.save("results/attention-sentiment-accuracy-wsb-stock-" + label_type + ".npy", np.array(accuracies))
+    np.save("results/attention-sentiment-f1-wsb-stock-" + label_type + ".npy", np.array(f1_scores))
+    np.save("results/attention-sentiment-m_coef-wsb-stock-" + label_type + ".npy", np.array(m_coef_scores))
 
 def main():
     args = parse_args()

@@ -6,7 +6,7 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, Packed
 class HierarchicalAttentionNetwork(nn.Module):
     def __init__(self, num_classes, vocab_size, embed_dim=300, word_gru_hidden_dim=350, sent_gru_hidden_dim=350,
                 word_gru_num_layers=2, sent_gru_num_layers=2, word_att_dim=150, sent_att_dim=150, use_layer_norm=False, dropout=0.5):
-        
+
         super(HierarchicalAttentionNetwork, self).__init__()
 
         self.sent_attention = SentenceAttention(
@@ -17,7 +17,7 @@ class HierarchicalAttentionNetwork(nn.Module):
         self.fc = nn.Linear(2 * sent_gru_hidden_dim, num_classes)
 
         # NOTE MODIFICATION (BUG)
-        # self.out = nn.LogSoftmax(dim=-1) # option 1
+        self.log_softmax = nn.LogSoftmax(dim=-1) # option 1
         # erase this line # option 2
 
         # NOTE MODIFICATION (FEATURES)
@@ -31,13 +31,17 @@ class HierarchicalAttentionNetwork(nn.Module):
         :param sent_lengths: unpadded sentence lengths; LongTensor (num_docs, max_sent_len)
         :return: class scores, attention weights of words, attention weights of sentences
         """
+        # print(docs.shape)
+        # print(doc_lengths.shape)
+        # print(sent_lengths.shape)
         doc_embeds, word_att_weights, sent_att_weights = self.sent_attention(docs, doc_lengths, sent_lengths)
 
         # NOTE MODIFICATION (BUG)
         # scores = self.out(self.fc(doc_embeds)) # option 1
         scores = self.fc(doc_embeds) # option 2
+        log_scores = self.log_softmax(scores)
 
-        return scores, word_att_weights, sent_att_weights
+        return scores
 
 
 class SentenceAttention(nn.Module):
@@ -102,7 +106,8 @@ class SentenceAttention(nn.Module):
             normed_sents = packed_sents
 
         # Sentence attention
-        att = torch.tanh(self.sent_attention(normed_sents))
+
+        att = torch.tanh(self.sent_attention(normed_sents.data))
         att = self.sentence_context_vector(att).squeeze(1)
 
         # NOTE MODIFICATION (BUG)
