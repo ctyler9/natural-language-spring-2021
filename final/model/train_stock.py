@@ -8,7 +8,7 @@ from tqdm import tqdm
 import argparse
 from model_cnn import NBOW
 # from model_attention import HierarchicalAttentionNetwork
-from model_attention_alt import HierarchicalAttentionNetwork, WordAttention
+from model_attention_alt import  WordAttention
 from vocab import Vocab, WSBDataStock, load_csv, create_vocab
 import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score, matthews_corrcoef
@@ -197,14 +197,15 @@ def nbow(device_type, save_model, label_type):
     #   print("load dev data")
     #   dev_data = TwitterData(path, dataframe=dev_df, vocab=vocab, train=False)
     #   print(train_data.vocab.get_vocab_size())
-
+    print("num classes")
+    print(n_classes)
     if device_type == "gpu":
         device = torch.device('cuda:0')
         nbow_model = NBOW(train_data.vocab.get_vocab_size(), DIM_EMB=350, NUM_CLASSES=n_classes).cuda()
         X = train_data.XwordList
         Y = train_data.Y
         dev_data = (dev_data.XwordList, dev_data.Y)
-        losses, accuracies, f1_scores, m_coef_scores = train_network(nbow_model, X, Y, 10, dev_data, batchSize=100, num_classes=n_classes, device = device)
+        losses, accuracies, f1_scores, m_coef_scores = train_network(nbow_model, X, Y, 10, dev_data, batchSize=100, lr=0.002, num_classes=n_classes, device = device)
         print(accuracies)
         print(f1_scores)
         print(m_coef_scores)

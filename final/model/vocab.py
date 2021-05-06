@@ -119,6 +119,18 @@ class WSBDataScore():
 		else:
 			self.dataframe = pd.read_csv(csv_file_path)
 
+		self.dataframe["timestamp"] = pd.to_datetime(self.dataframe["timestamp"].values, format='%Y-%m-%d %H:%M:%S')
+
+		sundays = self.dataframe[self.dataframe.timestamp.dt.weekday == 6]
+		print("num sundays")
+		print(len(sundays))
+		isBusinessday = BDay().is_on_offset
+		match_series = self.dataframe["timestamp"].map(isBusinessday)
+		self.dataframe = self.dataframe[match_series].copy()
+		self.dataframe = pd.concat([self.dataframe, sundays])
+		# self.dataframe = self.dataframe[(self.dataframe.timestamp.dt.weekday == 4) == False]
+		#
+
 		rows = self.dataframe.shape[0]
 		self.lowest_bound = -999999
 		self.get_stats_wsb()
@@ -242,7 +254,7 @@ class WSBDataScore():
 		theta2 = .50
 		func = theta1 * score + theta2 * comments
 		self.lowest_bound = func.min()
-		print(self.lowest_bound)
+		# print(self.lowest_bound)
 
 
 		## all pareto distributions which really shouldn't come as too
@@ -603,7 +615,7 @@ def main2():
 	plt.figure()
 	plt.bar(unique_labels, counts)
 	# plt.hist(labels, bins=5)
-	plt.title("WSB Training Data Derived Class Distribution")
+	plt.title("WSB Training Data Derived Class Distribution (Stock Up/Down)")
 	plt.xlabel("Classes")
 	plt.ylabel("Frequency")
 	plt.show()
